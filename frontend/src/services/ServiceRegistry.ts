@@ -3,7 +3,8 @@
  */
 
 import container from '../di-container';
-import { BrowserAudioService, MockAudioService } from './AudioService';
+import { MockAudioService } from './AudioService';
+import { BrowserAudioService } from './BrowserAudioService';
 import { ApplicationStateService } from './StateService';
 import { MockTranscriptionService, ApiTranscriptionService } from './TranscriptionService';
 import { DefaultAPIClient, MockAPIClient } from './ApiClient';
