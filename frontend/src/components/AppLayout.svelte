@@ -5,6 +5,7 @@
   import TranscriptionDisplay from './TranscriptionDisplay.svelte';
   import FeedbackDisplay from './FeedbackDisplay.svelte';
   import AnalyticsDisplay from './AnalyticsDisplay.svelte';
+  import AudioTest from './AudioTest.svelte';
   
   // Props
   export let currentState = AppState.IDLE;
@@ -85,7 +86,7 @@
     <div class="max-w-5xl mx-auto">
       <!-- Recording controls -->
       <div class="flex flex-col items-center mb-8">
-        <RecordButton {isRecording} onToggleRecording={onToggleRecording} />
+        <RecordButton {isRecording} {onToggleRecording} />
         <p class="mt-3 text-gray-600 text-center">
           {#if currentState === AppState.IDLE}
             Click the button to start recording your speech
@@ -113,6 +114,9 @@
               Generate Mock Data
             </button>
           </div>
+          
+          <!-- Add microphone test component for debugging -->
+          <AudioTest />
         </div>
       {/if}
       

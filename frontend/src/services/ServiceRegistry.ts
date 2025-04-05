@@ -3,15 +3,15 @@
  */
 
 import container from '../di-container';
-import { MockAudioService } from './AudioService';
-import { BrowserAudioService } from './BrowserAudioService';
+import { MockAudioService, BrowserAudioService } from './AudioService';
 import { ApplicationStateService } from './StateService';
 import { MockTranscriptionService, ApiTranscriptionService } from './TranscriptionService';
 import { DefaultAPIClient, MockAPIClient } from './ApiClient';
 
 // Environment-specific configurations
 const isDevelopment = import.meta.env.DEV;
-const useMocks = isDevelopment; // In development, use mock services by default
+// For debugging, let's always use the real implementation, not mocks
+const useMocks = false; // Temporarily disabled for debugging
 
 /**
  * Register all services with the container
@@ -20,6 +20,9 @@ export function registerServices() {
   // Register audio service
   container.register('IAudioService', 
     useMocks ? MockAudioService : BrowserAudioService);
+  
+  // Make sure we're using the correct implementation
+  console.log('Using audio service:', container.resolve('IAudioService').constructor.name);
   
   // Register state management service
   container.register('IStateService', ApplicationStateService);

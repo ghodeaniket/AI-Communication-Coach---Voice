@@ -1,10 +1,8 @@
-import { Injectable, ServiceLifetime } from '../di-container';
 import type { IAPIClient, AudioData, ProcessingResult } from '../interfaces';
 
 /**
  * Default implementation of the API Client
  */
-@Injectable(ServiceLifetime.SINGLETON)
 export class DefaultAPIClient implements IAPIClient {
   private endpoint: string;
   private timeout: number = 30000;
@@ -91,7 +89,6 @@ export class DefaultAPIClient implements IAPIClient {
 /**
  * Mock implementation of the API Client for development/testing
  */
-@Injectable(ServiceLifetime.SINGLETON)
 export class MockAPIClient implements IAPIClient {
   private endpoint: string = 'http://mock-api';
   private timeout: number = 30000;

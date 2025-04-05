@@ -108,20 +108,52 @@
   async function handleToggleRecording() {
     console.log('handleToggleRecording called, isRecording:', isRecording);
     console.log('audioService available:', !!audioService);
+    console.log('audioService type:', audioService?.constructor.name);
     
     try {
+      if (!audioService) {
+        console.error('No audio service available');
+        return;
+      }
+      
       if (isRecording) {
         console.log('Stopping recording...');
         await audioService.stopRecording();
         isRecording = false;
       } else {
         console.log('Starting recording...');
+        
+        // First, explicitly check for microphone permissions
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          // Immediately stop the stream since we're just checking permissions
+          stream.getTracks().forEach(track => track.stop());
+          console.log('Microphone permission granted');
+        } catch (err) {
+          console.error('Microphone permission denied:', err);
+          alert('Microphone permission is required for recording. Please grant permission and try again.');
+          return;
+        }
+        
+        await audioService.configure({
+          sampleRate: config?.audio?.sampleRate || 44100,
+          maxDuration: config?.audio?.maxRecordingDuration || 120,
+          reduceNoise: config?.audio?.noiseReduction || true
+        });
+        
         const success = await audioService.startRecording();
         console.log('Recording started, success:', success);
         isRecording = success;
+        
+        // If we get here but isRecording is false, something went wrong
+        if (!success) {
+          console.error('Failed to start recording for unknown reason');
+          alert('Failed to start recording. Please check console for details.');
+        }
       }
     } catch (error) {
       console.error('Error toggling recording:', error);
+      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
   

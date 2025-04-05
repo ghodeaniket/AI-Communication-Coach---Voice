@@ -1,11 +1,9 @@
 import type { IAudioService, AudioOptions, AudioData } from '../interfaces';
-import { Injectable, ServiceLifetime } from '../di-container';
 
 /**
  * Browser-based implementation of IAudioService that uses the browser's
  * MediaRecorder API to capture audio from the user's microphone.
  */
-@Injectable(ServiceLifetime.SINGLETON)
 export class BrowserAudioService implements IAudioService {
   private audioContext: AudioContext | null = null;
   private mediaRecorder: MediaRecorder | null = null;

@@ -1,4 +1,3 @@
-import { Injectable, ServiceLifetime } from '../di-container';
 import type { ITranscriptionService, AudioData, TranscriptionResult } from '../interfaces';
 
 /**
@@ -14,7 +13,6 @@ export enum TranscriptionStatus {
 /**
  * Mock implementation of the Transcription Service
  */
-@Injectable(ServiceLifetime.SINGLETON)
 export class MockTranscriptionService implements ITranscriptionService {
   private model: string = 'whisper-1';
   private status: TranscriptionStatus = TranscriptionStatus.IDLE;
@@ -100,7 +98,6 @@ export class MockTranscriptionService implements ITranscriptionService {
  * API-based implementation of the Transcription Service
  * Will call real API endpoint
  */
-@Injectable(ServiceLifetime.SINGLETON)
 export class ApiTranscriptionService implements ITranscriptionService {
   private model: string = 'whisper-1';
   private status: TranscriptionStatus = TranscriptionStatus.IDLE;

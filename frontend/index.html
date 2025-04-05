@@ -24,15 +24,24 @@
     </style>
   </head>
   <body>
-    <div id="debug-output"></div>
+    <div id="debug-output" style="display: none;"></div>
     <div id="app"></div>
     <script type="module">
-      // Debug helper
+      // Debug helper (only visible when triggered by URL parameter)
+      const params = new URLSearchParams(window.location.search);
+      const debugMode = params.get('debug') === 'true';
+      
+      if (debugMode) {
+        document.getElementById('debug-output').style.display = 'block';
+      }
+      
       window.debugLog = function(message) {
-        const debugEl = document.getElementById('debug-output');
-        const logItem = document.createElement('div');
-        logItem.textContent = `[${new Date().toISOString()}] ${message}`;
-        debugEl.appendChild(logItem);
+        if (debugMode) {
+          const debugEl = document.getElementById('debug-output');
+          const logItem = document.createElement('div');
+          logItem.textContent = `[${new Date().toISOString()}] ${message}`;
+          debugEl.appendChild(logItem);
+        }
         console.log(message);
       };
       

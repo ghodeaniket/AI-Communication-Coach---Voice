@@ -1,10 +1,8 @@
-import { Injectable, ServiceLifetime } from '../di-container';
 import type { IAudioService, AudioOptions, AudioData } from '../interfaces';
 
 /**
  * Browser-based implementation of the Audio Service
  */
-@Injectable(ServiceLifetime.SINGLETON)
 export class BrowserAudioService implements IAudioService {
   private audioContext: AudioContext | null = null;
   private mediaRecorder: MediaRecorder | null = null;
@@ -181,7 +179,6 @@ export class BrowserAudioService implements IAudioService {
 /**
  * Mock implementation for testing or development
  */
-@Injectable(ServiceLifetime.SINGLETON)
 export class MockAudioService implements IAudioService {
   private options: AudioOptions = {
     sampleRate: 44100,

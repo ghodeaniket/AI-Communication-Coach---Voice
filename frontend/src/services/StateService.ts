@@ -1,4 +1,3 @@
-import { Injectable, ServiceLifetime } from '../di-container';
 import type { IStateService } from '../interfaces';
 
 // Define application states
@@ -31,7 +30,6 @@ export const StateTransitions: Record<string, string[]> = {
  * associated data for each state. It follows the observer pattern
  * to notify components of state changes.
  */
-@Injectable(ServiceLifetime.SINGLETON)
 export class ApplicationStateService implements IStateService {
   private currentState: string = AppState.IDLE;
   private stateData: Map<string, any> = new Map();

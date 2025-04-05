@@ -3,7 +3,6 @@
  * 
  * This container supports:
  * - Service registration with different lifetimes (singleton, transient, scoped)
- * - Automatic dependency resolution
  * - Factory-based service registration
  * - Instance registration
  */
@@ -31,33 +30,6 @@ interface ServiceDescriptor {
   lifetime: ServiceLifetime;
   implementation?: any;
   factory?: ServiceFactory<any>;
-  dependencies?: string[];
-}
-
-// Decorator for marking injectable services
-export function Injectable(lifetime: ServiceLifetime = ServiceLifetime.SINGLETON) {
-  return function(target: any) {
-    // Store metadata about the service
-    Reflect.defineMetadata('lifetime', lifetime, target);
-    
-    // Extract constructor parameter types if available
-    const paramTypes = Reflect.getMetadata('design:paramtypes', target) || [];
-    const dependencies = paramTypes.map((type: any, index: number) => {
-      // Try to get the dependency ID from the parameter
-      return Reflect.getMetadata('di:paramname', target, `param:${index}`) || type.name;
-    });
-    
-    Reflect.defineMetadata('dependencies', dependencies, target);
-    
-    return target;
-  };
-}
-
-// Decorator for naming dependencies
-export function Inject(serviceId: string) {
-  return function(target: any, _: string | undefined, parameterIndex: number) {
-    Reflect.defineMetadata('di:paramname', serviceId, target, `param:${parameterIndex}`);
-  };
 }
 
 /**
@@ -71,17 +43,10 @@ export class DIContainer {
    * Register a service implementation
    */
   register<T>(id: string, implementation: new (...args: any[]) => T, lifetime = ServiceLifetime.SINGLETON): DIContainer {
-    // Get dependencies if reflection metadata is available
-    let dependencies: string[] = [];
-    if (typeof Reflect !== 'undefined' && Reflect.getMetadata) {
-      dependencies = Reflect.getMetadata('dependencies', implementation) || [];
-    }
-    
     this.services.set(id, { 
       id, 
       lifetime, 
-      implementation,
-      dependencies 
+      implementation
     });
     return this;
   }
@@ -124,12 +89,8 @@ export class DIContainer {
       // Use factory function
       instance = descriptor.factory(this);
     } else if (descriptor.implementation) {
-      // Resolve dependencies
-      const dependencies = (descriptor.dependencies || [])
-        .map(depId => this.resolve(depId));
-      
-      // Create instance with dependencies
-      instance = new descriptor.implementation(...dependencies);
+      // Create instance with dependencies (no auto-injection for now)
+      instance = new descriptor.implementation();
     } else {
       throw new Error(`Invalid service descriptor for: ${id}`);
     }

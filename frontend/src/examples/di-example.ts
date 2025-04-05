@@ -2,8 +2,7 @@
  * Example demonstrating Dependency Injection usage in the Voice Coach application
  */
 
-import 'reflect-metadata';
-import container, { Injectable, ServiceLifetime } from '../di-container';
+import container from '../di-container';
 import { initializeContainer } from '../services/ServiceRegistry';
 
 // Example services with dependencies
@@ -21,7 +20,6 @@ interface IUserService {
 }
 
 // Implementation of Logger service
-@Injectable(ServiceLifetime.SINGLETON)
 class ConsoleLogger implements ILogger {
   log(message: string): void {
     console.log(`[LOG] ${message}`);
@@ -29,9 +27,11 @@ class ConsoleLogger implements ILogger {
 }
 
 // Implementation of Mail service with Logger dependency
-@Injectable(ServiceLifetime.SINGLETON)
 class MockMailService implements IMailService {
-  constructor(private logger: ILogger) {
+  private logger: ILogger;
+  
+  constructor(logger: ILogger) {
+    this.logger = logger;
     this.logger.log('MockMailService created');
   }
   
@@ -42,12 +42,13 @@ class MockMailService implements IMailService {
 }
 
 // Implementation of User service with multiple dependencies
-@Injectable(ServiceLifetime.SINGLETON)
 class UserService implements IUserService {
-  constructor(
-    private logger: ILogger,
-    private mailService: IMailService
-  ) {
+  private logger: ILogger;
+  private mailService: IMailService;
+  
+  constructor(logger: ILogger, mailService: IMailService) {
+    this.logger = logger;
+    this.mailService = mailService;
     this.logger.log('UserService created with dependencies');
   }
   
@@ -76,8 +77,19 @@ class UserService implements IUserService {
 export async function runDIExample() {
   // Register services
   container.register('ILogger', ConsoleLogger);
-  container.register('IMailService', MockMailService);
-  container.register('IUserService', UserService);
+  
+  // Register mail service with a factory to inject the logger
+  container.registerFactory('IMailService', (container) => {
+    const logger = container.resolve<ILogger>('ILogger');
+    return new MockMailService(logger);
+  });
+  
+  // Register user service with a factory to inject dependencies
+  container.registerFactory('IUserService', (container) => {
+    const logger = container.resolve<ILogger>('ILogger');
+    const mailService = container.resolve<IMailService>('IMailService');
+    return new UserService(logger, mailService);
+  });
   
   // Resolve services
   const userService = container.resolve<IUserService>('IUserService');
@@ -87,8 +99,8 @@ export async function runDIExample() {
   console.log('Notification sent:', success);
   
   // This example demonstrates:
-  // 1. Services with dependencies are automatically created
-  // 2. Dependencies are injected recursively
+  // 1. Services with dependencies are created with factories
+  // 2. Dependencies are resolved from the container
   // 3. Singleton services are created only once
   
   return success;

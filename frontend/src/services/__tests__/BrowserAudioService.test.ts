@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BrowserAudioService } from '../BrowserAudioService';
 import type { AudioData } from '../../interfaces';
 
+// Mock the DI decorators
+vi.mock('../../di-container', () => ({
+  Injectable: () => (target: any) => target,
+  ServiceLifetime: {
+    SINGLETON: 'singleton'
+  }
+}));
+
 // Mock implementations
 const mockMediaRecorder = {
   start: vi.fn(),
@@ -14,6 +22,11 @@ const mockMediaRecorder = {
 const mockMediaStream = {
   getTracks: vi.fn().mockReturnValue([{ stop: vi.fn() }]),
 };
+
+// Mock for the stream property
+Object.defineProperty(mockMediaRecorder, 'stream', {
+  get: () => mockMediaStream
+});
 
 const mockAudioContext = {
   createBuffer: vi.fn(),

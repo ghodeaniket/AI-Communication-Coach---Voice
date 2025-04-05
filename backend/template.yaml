@@ -12,6 +12,16 @@ Parameters:
       - prod
     Description: Environment name
 
+  OpenAIApiKey:
+    Type: String
+    NoEcho: true
+    Description: API key for OpenAI services
+
+  CorsAllowedOrigins:
+    Type: String
+    Default: '*'
+    Description: Comma-separated list of allowed origins for CORS
+
 Globals:
   Function:
     Timeout: 30
@@ -20,9 +30,139 @@ Globals:
     Environment:
       Variables:
         ENVIRONMENT: !Ref Environment
+        OPENAI_API_KEY: !Ref OpenAIApiKey
+        CORS_ALLOWED_ORIGINS: !Ref CorsAllowedOrigins
+    Architectures:
+      - x86_64
 
 Resources:
-  # Placeholder for Lambda functions and other resources
-  
+  # API Gateway
+  VoiceCoachApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowOrigin: !Sub "'${CorsAllowedOrigins}'"
+      Auth:
+        DefaultAuthorizer: NONE
+      GatewayResponses:
+        DEFAULT_4XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: !Sub "'${CorsAllowedOrigins}'"
+              Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+              Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+        DEFAULT_5XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: !Sub "'${CorsAllowedOrigins}'"
+              Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+              Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+
+  # Lambda Functions
+  HealthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: dist/handlers/health.handler
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref VoiceCoachApi
+            Path: /health
+            Method: get
+      Policies:
+        - AWSLambdaBasicExecutionRole
+
+  TranscriptionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: dist/handlers/transcription.handler
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref VoiceCoachApi
+            Path: /transcribe
+            Method: post
+      Policies:
+        - AWSLambdaBasicExecutionRole
+
+  SpeechAnalyticsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: dist/handlers/speechAnalytics.handler
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref VoiceCoachApi
+            Path: /analyze
+            Method: post
+      Policies:
+        - AWSLambdaBasicExecutionRole
+
+  FeedbackFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: dist/handlers/feedback.handler
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref VoiceCoachApi
+            Path: /feedback
+            Method: post
+      Policies:
+        - AWSLambdaBasicExecutionRole
+
+  # DynamoDB Table for storing user results (if needed)
+  ResultsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "voice-coach-results-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: recordingId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: recordingId
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
 Outputs:
-  # Placeholder for outputs
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${VoiceCoachApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
+  
+  HealthFunction:
+    Description: Health Check Lambda Function ARN
+    Value: !GetAtt HealthFunction.Arn
+  
+  TranscriptionFunction:
+    Description: Transcription Lambda Function ARN
+    Value: !GetAtt TranscriptionFunction.Arn
+  
+  SpeechAnalyticsFunction:
+    Description: Speech Analytics Lambda Function ARN
+    Value: !GetAtt SpeechAnalyticsFunction.Arn
+  
+  FeedbackFunction:
+    Description: Feedback Generation Lambda Function ARN
+    Value: !GetAtt FeedbackFunction.Arn
+  
+  ResultsTableName:
+    Description: Name of the DynamoDB table for storing results
+    Value: !Ref ResultsTable
