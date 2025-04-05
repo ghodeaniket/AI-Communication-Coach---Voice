@@ -1,3 +1,4 @@
+import { Injectable, ServiceLifetime } from '../di-container';
 import type { IStateService } from '../interfaces';
 
 // Define application states
@@ -17,10 +18,15 @@ export interface StateObserver {
 /**
  * State management service implementation
  */
+@Injectable(ServiceLifetime.SINGLETON)
 export class ApplicationStateService implements IStateService {
   private currentState: string = AppState.IDLE;
   private stateData: Map<string, any> = new Map();
   private observers: StateObserver[] = [];
+  
+  constructor() {
+    console.log('ApplicationStateService initialized');
+  }
   
   /**
    * Get the current application state

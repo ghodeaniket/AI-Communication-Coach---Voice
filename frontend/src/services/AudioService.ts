@@ -1,8 +1,10 @@
+import { Injectable, ServiceLifetime } from '../di-container';
 import type { IAudioService, AudioOptions, AudioData } from '../interfaces';
 
 /**
  * Browser-based implementation of the Audio Service
  */
+@Injectable(ServiceLifetime.SINGLETON)
 export class BrowserAudioService implements IAudioService {
   private audioContext: AudioContext | null = null;
   private mediaRecorder: MediaRecorder | null = null;
@@ -19,6 +21,10 @@ export class BrowserAudioService implements IAudioService {
   // Event handlers
   public onRecordingStart?: () => void;
   public onRecordingStop?: (audio: AudioData) => void;
+  
+  constructor() {
+    console.log('BrowserAudioService initialized');
+  }
   
   /**
    * Configure the audio service with options
@@ -168,6 +174,85 @@ export class BrowserAudioService implements IAudioService {
   async optimizeAudio(audio: AudioData): Promise<AudioData> {
     // In a real implementation, this would apply noise reduction and normalization
     // For now, we'll just return the original audio
+    return audio;
+  }
+}
+
+/**
+ * Mock implementation for testing or development
+ */
+@Injectable(ServiceLifetime.SINGLETON)
+export class MockAudioService implements IAudioService {
+  private options: AudioOptions = {
+    sampleRate: 44100,
+    channels: 1,
+    reduceNoise: true,
+    normalizeVolume: true,
+    maxDuration: 120
+  };
+  
+  private isRecording: boolean = false;
+  
+  // Event handlers
+  public onRecordingStart?: () => void;
+  public onRecordingStop?: (audio: AudioData) => void;
+  
+  constructor() {
+    console.log('MockAudioService initialized');
+  }
+  
+  async configure(options: AudioOptions): Promise<boolean> {
+    this.options = { ...this.options, ...options };
+    return true;
+  }
+  
+  async startRecording(): Promise<boolean> {
+    this.isRecording = true;
+    
+    if (this.onRecordingStart) {
+      this.onRecordingStart();
+    }
+    
+    // Simulate recording for 3 seconds then auto-stop
+    setTimeout(() => {
+      if (this.isRecording) {
+        this.stopRecording();
+      }
+    }, 3000);
+    
+    return true;
+  }
+  
+  async stopRecording(): Promise<AudioData> {
+    if (!this.isRecording) {
+      throw new Error('Not currently recording');
+    }
+    
+    this.isRecording = false;
+    
+    // Create mock audio data
+    const audioData: AudioData = {
+      blob: new Blob(['mock audio data'], { type: 'audio/webm' }),
+      duration: 3,
+      sampleRate: this.options.sampleRate || 44100,
+      channels: this.options.channels || 1,
+      format: 'webm',
+      size: 1024
+    };
+    
+    // Apply optimizations
+    const optimizedAudio = await this.optimizeAudio(audioData);
+    
+    // Trigger event handler
+    if (this.onRecordingStop) {
+      this.onRecordingStop(optimizedAudio);
+    }
+    
+    return optimizedAudio;
+  }
+  
+  async optimizeAudio(audio: AudioData): Promise<AudioData> {
+    // Mock optimization - just return the same data
     return audio;
   }
 }
