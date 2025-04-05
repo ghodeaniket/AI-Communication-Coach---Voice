@@ -3,6 +3,7 @@
   import type DIContainer from './di-container';
   import type { IAudioService, IStateService } from './interfaces';
   import RecordButton from './components/RecordButton.svelte';
+  import StateDemo from './components/StateDemo.svelte';
   import { AppState } from './services/StateService';
   import { runDIExample } from './examples/di-example';
   
@@ -190,6 +191,12 @@
           </p>
         </div>
       {/if}
+      
+      <!-- State Management Demo Section -->
+      <div class="w-full max-w-2xl bg-white p-6 rounded-lg shadow mt-8">
+        <h2 class="text-xl font-semibold mb-4">State Management Demo</h2>
+        <StateDemo />
+      </div>
     </div>
     {/if}
   </div>
