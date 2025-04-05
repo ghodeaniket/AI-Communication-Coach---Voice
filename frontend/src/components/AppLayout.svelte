@@ -6,6 +6,7 @@
   import FeedbackDisplay from './FeedbackDisplay.svelte';
   import AnalyticsDisplay from './AnalyticsDisplay.svelte';
   import AudioTest from './AudioTest.svelte';
+  import SavedResultsList from './SavedResultsList.svelte';
   
   // Props
   export let currentState = AppState.IDLE;
@@ -15,6 +16,8 @@
   export let highlights = [];
   export let feedback = { overall: '', improvements: [], strengths: [] };
   export let analytics = {};
+  export let savedResults = [];
+  export let onLoadResult: (id: string) => void = () => {};
   
   // Show the mock data toggle for development purposes
   let showMockData = false;
@@ -70,6 +73,11 @@
       duration: 62
     };
   }
+  
+  // Format date for display
+  function formatDate(timestamp) {
+    return new Date(timestamp).toLocaleString();
+  }
 </script>
 
 <div class="min-h-screen bg-gray-100 pt-8 pb-12">
@@ -82,63 +90,78 @@
     <!-- Status indicator -->
     <StatusIndicator {currentState} {isRecording} />
     
-    <!-- Main content area -->
     <div class="max-w-5xl mx-auto">
-      <!-- Recording controls -->
-      <div class="flex flex-col items-center mb-8">
-        <RecordButton {isRecording} {onToggleRecording} />
-        <p class="mt-3 text-gray-600 text-center">
-          {#if currentState === AppState.IDLE}
-            Click the button to start recording your speech
-          {:else if currentState === AppState.RECORDING}
-            Click again to stop recording when you're finished
-          {:else if currentState === AppState.PROCESSING}
-            Please wait while we analyze your speech...
-          {:else if currentState === AppState.RESULTS}
-            Review your results below
-          {:else if currentState === AppState.ERROR}
-            An error occurred. Please try again.
+      <!-- Main content area with flex layout -->
+      <div class="flex flex-col lg:flex-row gap-6">
+        <!-- Left column - Recording and results -->
+        <div class="lg:w-3/4">
+          <!-- Recording controls -->
+          <div class="flex flex-col items-center mb-8">
+            <RecordButton {isRecording} {onToggleRecording} />
+            <p class="mt-3 text-gray-600 text-center">
+              {#if currentState === AppState.IDLE}
+                Click the button to start recording your speech
+              {:else if currentState === AppState.RECORDING}
+                Click again to stop recording when you're finished
+              {:else if currentState === AppState.PROCESSING}
+                Please wait while we analyze your speech...
+              {:else if currentState === AppState.RESULTS}
+                Review your results below
+              {:else if currentState === AppState.ERROR}
+                An error occurred. Please try again.
+              {/if}
+            </p>
+          </div>
+          
+          <!-- Development tools (only in dev mode) -->
+          {#if import.meta.env.DEV}
+            <div class="mb-6 p-3 bg-gray-200 rounded text-sm">
+              <div class="flex items-center justify-between">
+                <span class="font-semibold">Development Tools</span>
+                <button 
+                  class="px-3 py-1 bg-blue-500 text-white text-xs rounded"
+                  on:click={generateMockData}
+                >
+                  Generate Mock Data
+                </button>
+              </div>
+              
+              <!-- Add microphone test component for debugging -->
+              <AudioTest />
+            </div>
           {/if}
-        </p>
+          
+          <!-- Results section -->
+          {#if currentState === AppState.RESULTS || showMockData}
+            <div class="space-y-6">
+              <!-- Transcription -->
+              <TranscriptionDisplay {transcription} {highlights} />
+              
+              <!-- Analytics & Feedback -->
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <AnalyticsDisplay {analytics} />
+                <FeedbackDisplay {feedback} />
+              </div>
+            </div>
+          {:else if currentState === AppState.ERROR}
+            <div class="bg-red-50 p-6 rounded-lg border border-red-200 text-center">
+              <h2 class="text-xl font-semibold mb-2 text-red-700">Error</h2>
+              <p class="text-red-600 mb-4">Sorry, something went wrong while processing your speech.</p>
+              <p>Please try recording again. If the problem persists, try refreshing the page.</p>
+            </div>
+          {/if}
+        </div>
+        
+        <!-- Right column - Saved results -->
+        <div class="lg:w-1/4">
+          {#if savedResults && savedResults.length > 0}
+            <div class="bg-white rounded-lg shadow p-4">
+              <h2 class="text-lg font-medium mb-3">Previous Recordings</h2>
+              <SavedResultsList {savedResults} {onLoadResult} />
+            </div>
+          {/if}
+        </div>
       </div>
-      
-      <!-- Development tools (only in dev mode) -->
-      {#if import.meta.env.DEV}
-        <div class="mb-6 p-3 bg-gray-200 rounded text-sm">
-          <div class="flex items-center justify-between">
-            <span class="font-semibold">Development Tools</span>
-            <button 
-              class="px-3 py-1 bg-blue-500 text-white text-xs rounded"
-              on:click={generateMockData}
-            >
-              Generate Mock Data
-            </button>
-          </div>
-          
-          <!-- Add microphone test component for debugging -->
-          <AudioTest />
-        </div>
-      {/if}
-      
-      <!-- Results section -->
-      {#if currentState === AppState.RESULTS || showMockData}
-        <div class="space-y-6">
-          <!-- Transcription -->
-          <TranscriptionDisplay {transcription} {highlights} />
-          
-          <!-- Analytics & Feedback -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <AnalyticsDisplay {analytics} />
-            <FeedbackDisplay {feedback} />
-          </div>
-        </div>
-      {:else if currentState === AppState.ERROR}
-        <div class="bg-red-50 p-6 rounded-lg border border-red-200 text-center">
-          <h2 class="text-xl font-semibold mb-2 text-red-700">Error</h2>
-          <p class="text-red-600 mb-4">Sorry, something went wrong while processing your speech.</p>
-          <p>Please try recording again. If the problem persists, try refreshing the page.</p>
-        </div>
-      {/if}
     </div>
   </div>
 </div>

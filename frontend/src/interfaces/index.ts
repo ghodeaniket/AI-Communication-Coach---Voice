@@ -75,3 +75,34 @@ export interface ProcessingResult {
   analytics: any;
   feedback: any;
 }
+
+// Results Service Interface
+export interface IResultsService {
+  saveResult(result: RecordingResult): Promise<string>;
+  getResult(id: string): Promise<RecordingResult | null>;
+  listResults(limit?: number): Promise<RecordingResultSummary[]>;
+  deleteResult(id: string): Promise<boolean>;
+}
+
+export interface RecordingResult {
+  id?: string;
+  timestamp: number;
+  audioData?: Partial<AudioData>;
+  transcription: TranscriptionResult;
+  analytics: any;
+  feedback: any;
+  highlights?: any[];
+  meta?: {
+    duration: number;
+    deviceInfo?: string;
+    sessionId?: string;
+  };
+}
+
+export interface RecordingResultSummary {
+  id: string;
+  timestamp: number;
+  duration: number;
+  textPreview: string;
+  overallScore?: number;
+}

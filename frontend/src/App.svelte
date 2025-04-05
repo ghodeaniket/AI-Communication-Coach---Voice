@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { IAudioService, IStateService } from './interfaces';
+  import type { IAudioService, IStateService, IAPIClient, AudioData, ProcessingResult } from './interfaces';
+  import type { IResultsService, RecordingResult } from './services/ResultsService';
   import { AppState } from './services/StateService';
   import AppLayout from './components/AppLayout.svelte';
   
@@ -19,23 +20,31 @@
   let highlights = [];
   let feedback = { overall: '', improvements: [], strengths: [] };
   let analytics = {};
+  let savedResults = [];
   
   // Resolve services from container
   let audioService: IAudioService;
   let stateService: IStateService;
+  let apiClient: IAPIClient;
+  let resultsService: IResultsService;
   
   onMount(() => {
     console.log('App.svelte onMount called');
     
     try {
       // Initialize services from container
-      console.log('Resolving IAudioService from container');
+      console.log('Resolving services from container');
       audioService = container.resolve('IAudioService');
-      console.log('AudioService resolved:', audioService);
-      
-      console.log('Resolving IStateService from container');
       stateService = container.resolve('IStateService');
-      console.log('StateService resolved:', stateService);
+      apiClient = container.resolve('IAPIClient');
+      resultsService = container.resolve('IResultsService');
+      
+      console.log('Services resolved:', { 
+        audioService: audioService?.constructor.name, 
+        stateService: stateService?.constructor.name,
+        apiClient: apiClient?.constructor.name,
+        resultsService: resultsService?.constructor.name
+      });
     
       // Subscribe to state changes
       stateService.subscribe({
@@ -46,8 +55,6 @@
           // Handle state-specific logic
           if (state === AppState.RESULTS && data.transcription) {
             transcription = data.transcription.text;
-            
-            // In a real app, these would come from the backend
             highlights = data.highlights || [];
             feedback = data.feedback || { overall: '', improvements: [], strengths: [] };
             analytics = data.analytics || {};
@@ -62,6 +69,21 @@
         reduceNoise: config?.audio?.noiseReduction || true
       });
       
+      // Set up API client
+      if (config?.api?.endpoint) {
+        apiClient.setEndpoint(config.api.endpoint);
+      }
+      
+      if (config?.api?.timeout) {
+        apiClient.setTimeout(config.api.timeout);
+      }
+      
+      // Check API health
+      checkApiHealth();
+      
+      // Load previous results
+      loadPreviousResults();
+      
       // Set up event handlers
       audioService.onRecordingStart = () => {
         stateService.transition(AppState.RECORDING);
@@ -69,46 +91,173 @@
       
       audioService.onRecordingStop = async (audio) => {
         isRecording = false;
-        stateService.transition(AppState.PROCESSING);
-        stateService.setStateData('audioData', audio);
-        
-        try {
-          // In a real app, we would process the audio here by sending to backend
-          // For now just simulate a delay and transition to results with mock data
-          setTimeout(() => {
-            stateService.transition(AppState.RESULTS);
-            
-            // Set mock results data
-            const mockResults = getMockResults();
-            stateService.setStateData('transcription', { text: mockResults.transcription });
-            stateService.setStateData('highlights', mockResults.highlights);
-            stateService.setStateData('feedback', mockResults.feedback);
-            stateService.setStateData('analytics', mockResults.analytics);
-            
-            // Update local state for components
-            transcription = mockResults.transcription;
-            highlights = mockResults.highlights;
-            feedback = mockResults.feedback;
-            analytics = mockResults.analytics;
-          }, 2000);
-        } catch (error) {
-          console.error('Error processing audio:', error);
-          stateService.transition(AppState.ERROR);
-          stateService.setStateData('error', error);
+        await processRecordedAudio(audio);
+      };
+      
+      console.log('App mounted with services:', { 
+        audioService: !!audioService, 
+        stateService: !!stateService,
+        apiClient: !!apiClient,
+        resultsService: !!resultsService
+      });
+    } catch (error) {
+      console.error('Error in onMount:', error);
+      stateService?.transition(AppState.ERROR);
+      stateService?.setStateData('error', error);
+    }
+  });
+  
+  // Load previously saved results
+  async function loadPreviousResults(limit = 5) {
+    try {
+      const results = await resultsService.listResults(limit);
+      console.log('Loaded previous results:', results);
+      savedResults = results;
+      stateService.setStateData('savedResults', results);
+    } catch (error) {
+      console.error('Error loading previous results:', error);
+    }
+  }
+  
+  // Check API health on startup
+  async function checkApiHealth() {
+    try {
+      const health = await apiClient.checkServiceHealth();
+      console.log('API health status:', health.status);
+      
+      if (health.status !== 'healthy') {
+        console.warn('API is not healthy, status:', health.status);
+      }
+    } catch (error) {
+      console.error('API health check failed:', error);
+    }
+  }
+  
+  // Process recorded audio through the API
+  async function processRecordedAudio(audio: AudioData) {
+    try {
+      stateService.transition(AppState.PROCESSING);
+      stateService.setStateData('audioData', audio);
+      
+      console.log('Processing audio with API client...');
+      
+      // Optimize audio before sending to API
+      const optimizedAudio = await audioService.optimizeAudio(audio);
+      
+      // Send to API for processing
+      const result: ProcessingResult = await apiClient.processAudio(optimizedAudio);
+      
+      console.log('API processing complete:', result);
+      
+      // Update state with results
+      stateService.transition(AppState.RESULTS);
+      stateService.setStateData('transcription', result.transcription);
+      stateService.setStateData('feedback', result.feedback);
+      stateService.setStateData('analytics', result.analytics);
+      
+      // Generate highlights from analytics
+      const highlights = generateHighlightsFromAnalytics(
+        result.transcription.text, 
+        result.analytics
+      );
+      stateService.setStateData('highlights', highlights);
+      
+      // Update local state for components
+      transcription = result.transcription.text;
+      feedback = result.feedback;
+      analytics = result.analytics;
+      
+      // Save the result for persistence
+      saveResult(audio, result, highlights);
+    } catch (error) {
+      console.error('Error processing audio:', error);
+      stateService.transition(AppState.ERROR);
+      stateService.setStateData('error', error);
+    }
+  }
+  
+  // Save the result to persistent storage
+  async function saveResult(audio: AudioData, result: ProcessingResult, highlights: any[]) {
+    try {
+      // Prepare result data
+      const recordingResult: RecordingResult = {
+        timestamp: Date.now(),
+        audioData: {
+          duration: audio.duration,
+          sampleRate: audio.sampleRate,
+          channels: audio.channels,
+          format: audio.format,
+          size: audio.size,
+        },
+        transcription: result.transcription,
+        analytics: result.analytics,
+        feedback: result.feedback,
+        highlights,
+        meta: {
+          duration: audio.duration,
+          deviceInfo: navigator.userAgent,
+          sessionId: crypto.randomUUID ? crypto.randomUUID() : undefined
         }
       };
       
-      console.log('App mounted with services:', { audioService, stateService });
+      // Save result
+      const id = await resultsService.saveResult(recordingResult);
+      console.log('Result saved with ID:', id);
+      
+      // Update state with saved result ID
+      stateService.setStateData('savedResultId', id);
+      
+      // Refresh saved results list
+      loadPreviousResults();
     } catch (error) {
-      console.error('Error in onMount:', error);
+      console.error('Error saving result:', error);
     }
-  });
+  }
+  
+  // Helper to generate transcript highlights from analytics
+  function generateHighlightsFromAnalytics(text: string, analytics: any) {
+    const highlights = [];
+    
+    // If the backend doesn't provide highlights, we can generate them here
+    // based on the analytics data (filler words, pauses, etc.)
+    
+    // Example: Highlight filler words
+    if (analytics.fillerWords?.words) {
+      for (const word of analytics.fillerWords.words) {
+        let regex = new RegExp(`\\b${word}\\b`, 'gi');
+        let match;
+        
+        while ((match = regex.exec(text)) !== null) {
+          highlights.push({
+            start: match.index,
+            end: match.index + word.length,
+            type: 'filler',
+            tooltip: 'Filler word'
+          });
+        }
+      }
+    }
+    
+    // Example: Highlight pauses if they have specific locations
+    if (analytics.pauses?.locations) {
+      for (const pause of analytics.pauses.locations) {
+        highlights.push({
+          start: pause.position,
+          end: pause.position + 1, // Just highlight one character
+          type: 'pause',
+          tooltip: `Pause (${pause.duration.toFixed(1)}s)`
+        });
+      }
+    }
+    
+    // More highlight generation logic can be added here
+    
+    return highlights;
+  }
   
   // Handle record button click
   async function handleToggleRecording() {
     console.log('handleToggleRecording called, isRecording:', isRecording);
-    console.log('audioService available:', !!audioService);
-    console.log('audioService type:', audioService?.constructor.name);
     
     try {
       if (!audioService) {
@@ -135,12 +284,14 @@
           return;
         }
         
+        // Configure audio service
         await audioService.configure({
           sampleRate: config?.audio?.sampleRate || 44100,
           maxDuration: config?.audio?.maxRecordingDuration || 120,
           reduceNoise: config?.audio?.noiseReduction || true
         });
         
+        // Start recording
         const success = await audioService.startRecording();
         console.log('Recording started, success:', success);
         isRecording = success;
@@ -157,51 +308,29 @@
     }
   }
   
-  // Create mock results for testing
-  function getMockResults() {
-    return {
-      transcription: "Hello, um, thank you for, uh, listening to my speech today. I'm going to talk about effective communication. So, you know, communication is really important in our daily lives. It helps us connect with others and, like, share our ideas. When we communicate clearly, we can avoid misunderstandings and build stronger relationships. Um, another thing to consider is that good communication involves active listening. This means, you know, paying attention to what others are saying and responding thoughtfully. In conclusion, effective communication is essential for success in both personal and professional contexts.",
-      highlights: [
-        { start: 7, end: 9, type: 'filler', tooltip: 'Filler word' },
-        { start: 28, end: 30, type: 'filler', tooltip: 'Filler word' },
-        { start: 108, end: 117, type: 'pause', tooltip: 'Long pause (1.2s)' },
-        { start: 160, end: 168, type: 'emphasis', tooltip: 'Good emphasis' },
-        { start: 277, end: 279, type: 'filler', tooltip: 'Filler word' },
-        { start: 342, end: 350, type: 'filler', tooltip: 'Filler word' }
-      ],
-      feedback: {
-        overall: "Your speech was generally clear and well-structured with a good introduction and conclusion. However, you used several filler words that could be reduced to make your delivery more polished.",
-        improvements: [
-          "Reduce filler words like 'um' and 'uh'",
-          "Consider using more varied sentence structures",
-          "Practice more natural pausing between key points"
-        ],
-        strengths: [
-          "Clear introduction and conclusion",
-          "Good topic explanation",
-          "Appropriate speaking pace"
-        ],
-        score: 78
-      },
-      analytics: {
-        speakingRate: {
-          wordsPerMinute: 145,
-          syllablesPerMinute: 195,
-          rating: "good"
-        },
-        fillerWords: {
-          count: 5,
-          words: ["um", "uh", "like", "you know"],
-          percentage: 8.2
-        },
-        pauses: {
-          count: 4,
-          totalDuration: 5.3,
-          avgDuration: 1.33
-        },
-        duration: 62
+  // Handle loading a previous result
+  async function handleLoadResult(id: string) {
+    try {
+      const result = await resultsService.getResult(id);
+      
+      if (result) {
+        // Update state with loaded result
+        stateService.transition(AppState.RESULTS);
+        stateService.setStateData('transcription', result.transcription);
+        stateService.setStateData('feedback', result.feedback);
+        stateService.setStateData('analytics', result.analytics);
+        stateService.setStateData('highlights', result.highlights);
+        stateService.setStateData('savedResultId', id);
+        
+        // Update local state for components
+        transcription = result.transcription.text;
+        feedback = result.feedback;
+        analytics = result.analytics;
+        highlights = result.highlights || [];
       }
-    };
+    } catch (error) {
+      console.error('Error loading result:', error);
+    }
   }
 </script>
 
@@ -222,5 +351,7 @@
     {highlights}
     {feedback}
     {analytics}
+    savedResults={savedResults}
+    onLoadResult={handleLoadResult}
   />
 {/if}

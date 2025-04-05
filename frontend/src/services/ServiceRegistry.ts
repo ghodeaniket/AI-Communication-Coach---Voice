@@ -7,11 +7,12 @@ import { MockAudioService, BrowserAudioService } from './AudioService';
 import { ApplicationStateService } from './StateService';
 import { MockTranscriptionService, ApiTranscriptionService } from './TranscriptionService';
 import { DefaultAPIClient, MockAPIClient } from './ApiClient';
+import { LocalStorageResultsService, ApiResultsService } from './ResultsService';
 
 // Environment-specific configurations
 const isDevelopment = import.meta.env.DEV;
-// For debugging, let's always use the real implementation, not mocks
-const useMocks = false; // Temporarily disabled for debugging
+// For debugging, we can choose to use mock services or real implementations
+const useMocks = false; // Set to false to use real implementations
 
 /**
  * Register all services with the container
@@ -20,9 +21,6 @@ export function registerServices() {
   // Register audio service
   container.register('IAudioService', 
     useMocks ? MockAudioService : BrowserAudioService);
-  
-  // Make sure we're using the correct implementation
-  console.log('Using audio service:', container.resolve('IAudioService').constructor.name);
   
   // Register state management service
   container.register('IStateService', ApplicationStateService);
@@ -35,6 +33,10 @@ export function registerServices() {
   container.register('IAPIClient', 
     useMocks ? MockAPIClient : DefaultAPIClient);
   
+  // Register results service
+  container.register('IResultsService', 
+    useMocks ? LocalStorageResultsService : ApiResultsService);
+  
   // Log registered services in development
   if (isDevelopment) {
     console.log('Service registration complete with the following services:');
@@ -42,6 +44,7 @@ export function registerServices() {
     console.log('- IStateService: ApplicationStateService');
     console.log('- ITranscriptionService:', useMocks ? 'MockTranscriptionService' : 'ApiTranscriptionService');
     console.log('- IAPIClient:', useMocks ? 'MockAPIClient' : 'DefaultAPIClient');
+    console.log('- IResultsService:', useMocks ? 'LocalStorageResultsService' : 'ApiResultsService');
   }
   
   return container;
