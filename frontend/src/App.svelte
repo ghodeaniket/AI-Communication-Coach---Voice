@@ -28,19 +28,32 @@
   let apiClient: IAPIClient;
   let resultsService: IResultsService;
   
+  // Flag for audio service availability
+  let audioServiceAvailable = false;
+  let loadError = '';
+  
   onMount(() => {
     console.log('App.svelte onMount called');
     
     try {
       // Initialize services from container
       console.log('Resolving services from container');
-      audioService = container.resolve('IAudioService');
       stateService = container.resolve('IStateService');
       apiClient = container.resolve('IAPIClient');
       resultsService = container.resolve('IResultsService');
       
+      // Try to initialize audio service
+      try {
+        audioService = container.resolve('IAudioService');
+        console.log('Audio service resolved:', audioService?.constructor.name);
+        audioServiceAvailable = !!audioService;
+      } catch (e) {
+        console.error('Failed to resolve audio service:', e);
+        audioServiceAvailable = false;
+      }
+      
       console.log('Services resolved:', { 
-        audioService: audioService?.constructor.name, 
+        audioService: audioServiceAvailable ? audioService?.constructor.name : 'Not Available', 
         stateService: stateService?.constructor.name,
         apiClient: apiClient?.constructor.name,
         resultsService: resultsService?.constructor.name
@@ -62,12 +75,26 @@
         }
       });
       
-      // Initialize audio service
-      audioService.configure({
-        sampleRate: config?.audio?.sampleRate || 44100,
-        maxDuration: config?.audio?.maxRecordingDuration || 120,
-        reduceNoise: config?.audio?.noiseReduction || true
-      });
+      // Initialize audio service if available
+      if (audioServiceAvailable) {
+        audioService.configure({
+          sampleRate: config?.audio?.sampleRate || 44100,
+          maxDuration: config?.audio?.maxRecordingDuration || 120,
+          reduceNoise: config?.audio?.noiseReduction || true
+        });
+        
+        // Set up event handlers
+        audioService.onRecordingStart = () => {
+          stateService.transition(AppState.RECORDING);
+        };
+        
+        audioService.onRecordingStop = async (audio) => {
+          isRecording = false;
+          await processRecordedAudio(audio);
+        };
+      } else {
+        console.warn('Audio service not available - recording functionality will be disabled');
+      }
       
       // Set up API client
       if (config?.api?.endpoint) {
@@ -84,24 +111,15 @@
       // Load previous results
       loadPreviousResults();
       
-      // Set up event handlers
-      audioService.onRecordingStart = () => {
-        stateService.transition(AppState.RECORDING);
-      };
-      
-      audioService.onRecordingStop = async (audio) => {
-        isRecording = false;
-        await processRecordedAudio(audio);
-      };
-      
       console.log('App mounted with services:', { 
-        audioService: !!audioService, 
+        audioService: audioServiceAvailable, 
         stateService: !!stateService,
         apiClient: !!apiClient,
         resultsService: !!resultsService
       });
     } catch (error) {
       console.error('Error in onMount:', error);
+      loadError = error instanceof Error ? error.message : String(error);
       stateService?.transition(AppState.ERROR);
       stateService?.setStateData('error', error);
     }
@@ -142,7 +160,10 @@
       console.log('Processing audio with API client...');
       
       // Optimize audio before sending to API
-      const optimizedAudio = await audioService.optimizeAudio(audio);
+      let optimizedAudio = audio;
+      if (audioServiceAvailable) {
+        optimizedAudio = await audioService.optimizeAudio(audio);
+      }
       
       // Send to API for processing
       const result: ProcessingResult = await apiClient.processAudio(optimizedAudio);
@@ -173,6 +194,34 @@
       console.error('Error processing audio:', error);
       stateService.transition(AppState.ERROR);
       stateService.setStateData('error', error);
+    }
+  }
+  
+  // Create mock audio data for testing
+  function createMockAudioData(): AudioData {
+    return {
+      blob: new Blob(['mock audio data'], { type: 'audio/webm' }),
+      duration: 45.5,
+      sampleRate: 44100,
+      channels: 1,
+      format: 'webm',
+      size: 1024
+    };
+  }
+  
+  // Generate mock data for testing
+  async function generateMockData() {
+    console.log('Generating mock data...');
+    
+    try {
+      // Create mock audio data
+      const mockAudio = createMockAudioData();
+      
+      // Process it as if it was recorded
+      await processRecordedAudio(mockAudio);
+    } catch (error) {
+      console.error('Error generating mock data:', error);
+      alert('Error generating mock data: ' + (error instanceof Error ? error.message : String(error)));
     }
   }
   
@@ -259,12 +308,13 @@
   async function handleToggleRecording() {
     console.log('handleToggleRecording called, isRecording:', isRecording);
     
+    if (!audioServiceAvailable) {
+      console.error('No audio service available');
+      alert('Audio recording is not available in this environment. Please use the "Generate Mock Data" button instead.');
+      return;
+    }
+    
     try {
-      if (!audioService) {
-        console.error('No audio service available');
-        return;
-      }
-      
       if (isRecording) {
         console.log('Stopping recording...');
         await audioService.stopRecording();
@@ -334,11 +384,11 @@
   }
 </script>
 
-{#if error}
+{#if error || loadError}
   <div class="min-h-screen bg-gray-100 flex items-center justify-center">
     <div class="max-w-2xl mx-auto bg-red-50 p-6 rounded-lg border border-red-200">
       <h2 class="text-xl font-semibold mb-2 text-red-700">Application Error</h2>
-      <p class="text-red-600 mb-4">{error}</p>
+      <p class="text-red-600 mb-4">{error || loadError}</p>
       <p>Please check the browser console for more details or try refreshing the page.</p>
     </div>
   </div>
@@ -346,7 +396,9 @@
   <AppLayout 
     {currentState}
     {isRecording}
+    {audioServiceAvailable}
     onToggleRecording={handleToggleRecording}
+    onGenerateMockData={generateMockData}
     {transcription}
     {highlights}
     {feedback}

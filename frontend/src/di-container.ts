@@ -118,24 +118,8 @@ export class DIContainer {
   }
 }
 
-// Import service implementations
-import { BrowserAudioService } from './services/BrowserAudioService';
-import { ApplicationStateService } from './services/StateService';
-
-// Create and configure the container
-export function createContainer(): DIContainer {
-  const container = new DIContainer();
-  
-  // Register core services
-  container.register<IAudioService>('IAudioService', BrowserAudioService);
-  container.register<IStateService>('IStateService', ApplicationStateService);
-  
-  // Register mock services for development
-  // These will be replaced with real implementations later
-  
-  return container;
-}
+// Create container
+const container = new DIContainer();
 
 // Export singleton container instance
-export const container = createContainer();
 export default container;

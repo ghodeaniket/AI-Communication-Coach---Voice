@@ -11,73 +11,15 @@
   // Props
   export let currentState = AppState.IDLE;
   export let isRecording = false;
+  export let audioServiceAvailable = false;
   export let onToggleRecording: () => void;
+  export let onGenerateMockData: () => void;
   export let transcription = '';
   export let highlights = [];
   export let feedback = { overall: '', improvements: [], strengths: [] };
   export let analytics = {};
   export let savedResults = [];
   export let onLoadResult: (id: string) => void = () => {};
-  
-  // Show the mock data toggle for development purposes
-  let showMockData = false;
-  
-  // Development helper to generate mock data
-  function generateMockData() {
-    // Mock transcription
-    transcription = "Hello, um, thank you for, uh, listening to my speech today. I'm going to talk about effective communication. So, you know, communication is really important in our daily lives. It helps us connect with others and, like, share our ideas. When we communicate clearly, we can avoid misunderstandings and build stronger relationships. Um, another thing to consider is that good communication involves active listening. This means, you know, paying attention to what others are saying and responding thoughtfully. In conclusion, effective communication is essential for success in both personal and professional contexts.";
-    
-    // Mock highlights
-    highlights = [
-      { start: 7, end: 9, type: 'filler', tooltip: 'Filler word' },
-      { start: 28, end: 30, type: 'filler', tooltip: 'Filler word' },
-      { start: 108, end: 117, type: 'pause', tooltip: 'Long pause (1.2s)' },
-      { start: 160, end: 168, type: 'emphasis', tooltip: 'Good emphasis' },
-      { start: 277, end: 279, type: 'filler', tooltip: 'Filler word' },
-      { start: 342, end: 350, type: 'filler', tooltip: 'Filler word' }
-    ];
-    
-    // Mock feedback
-    feedback = {
-      overall: "Your speech was generally clear and well-structured with a good introduction and conclusion. However, you used several filler words that could be reduced to make your delivery more polished.",
-      improvements: [
-        "Reduce filler words like 'um' and 'uh'",
-        "Consider using more varied sentence structures",
-        "Practice more natural pausing between key points"
-      ],
-      strengths: [
-        "Clear introduction and conclusion",
-        "Good topic explanation",
-        "Appropriate speaking pace"
-      ],
-      score: 78
-    };
-    
-    // Mock analytics
-    analytics = {
-      speakingRate: {
-        wordsPerMinute: 145,
-        syllablesPerMinute: 195,
-        rating: "good"
-      },
-      fillerWords: {
-        count: 5,
-        words: ["um", "uh", "like", "you know"],
-        percentage: 8.2
-      },
-      pauses: {
-        count: 4,
-        totalDuration: 5.3,
-        avgDuration: 1.33
-      },
-      duration: 62
-    };
-  }
-  
-  // Format date for display
-  function formatDate(timestamp) {
-    return new Date(timestamp).toLocaleString();
-  }
 </script>
 
 <div class="min-h-screen bg-gray-100 pt-8 pb-12">
@@ -97,9 +39,23 @@
         <div class="lg:w-3/4">
           <!-- Recording controls -->
           <div class="flex flex-col items-center mb-8">
-            <RecordButton {isRecording} {onToggleRecording} />
-            <p class="mt-3 text-gray-600 text-center">
-              {#if currentState === AppState.IDLE}
+            <div class="flex flex-col sm:flex-row items-center gap-4">
+              <!-- Record button -->
+              <RecordButton {isRecording} onToggleRecording={onToggleRecording} />
+              
+              <!-- Mock data button -->
+              <button 
+                class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                on:click={onGenerateMockData}
+              >
+                Generate Mock Data
+              </button>
+            </div>
+            
+            <p class="mt-4 text-gray-600 text-center">
+              {#if !audioServiceAvailable}
+                <span class="text-orange-600 font-semibold">Audio recording is not available. Use "Generate Mock Data" instead.</span>
+              {:else if currentState === AppState.IDLE}
                 Click the button to start recording your speech
               {:else if currentState === AppState.RECORDING}
                 Click again to stop recording when you're finished
@@ -116,23 +72,16 @@
           <!-- Development tools (only in dev mode) -->
           {#if import.meta.env.DEV}
             <div class="mb-6 p-3 bg-gray-200 rounded text-sm">
-              <div class="flex items-center justify-between">
+              <div class="flex flex-col gap-2">
                 <span class="font-semibold">Development Tools</span>
-                <button 
-                  class="px-3 py-1 bg-blue-500 text-white text-xs rounded"
-                  on:click={generateMockData}
-                >
-                  Generate Mock Data
-                </button>
+                <!-- Add microphone test component for debugging -->
+                <AudioTest />
               </div>
-              
-              <!-- Add microphone test component for debugging -->
-              <AudioTest />
             </div>
           {/if}
           
           <!-- Results section -->
-          {#if currentState === AppState.RESULTS || showMockData}
+          {#if currentState === AppState.RESULTS}
             <div class="space-y-6">
               <!-- Transcription -->
               <TranscriptionDisplay {transcription} {highlights} />

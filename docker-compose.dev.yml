@@ -12,17 +12,14 @@ services:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
     environment:
-      - VITE_API_ENDPOINT=http://localhost:3000/api
-  
-  # LocalStack for AWS services emulation
-  localstack:
-    image: localstack/localstack:latest
-    ports:
-      - "4566:4566"
-    environment:
-      - SERVICES=dynamodb,s3,lambda
-      - DEBUG=1
-      - DATA_DIR=/tmp/localstack/data
-    volumes:
-      - ./localstack:/docker-entrypoint-initaws.d
-      - ./localstack-data:/tmp/localstack/data
+      - VITE_API_ENDPOINT=http://host.docker.internal:3333/api
+      - VITE_API_TIMEOUT=30000
+      - VITE_API_VERSION=v1
+      - VITE_MAX_RECORDING_DURATION=120
+      - VITE_AUDIO_SAMPLE_RATE=44100
+      - VITE_AUDIO_NOISE_REDUCTION=true
+      - VITE_FEATURE_ADVANCED_METRICS=true
+      - VITE_FEATURE_RECORDING_COMPARISON=true
+      - VITE_FEATURE_SOCIAL_SHARING=false
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
