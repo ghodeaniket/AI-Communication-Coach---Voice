@@ -37,7 +37,7 @@ const generateTranscriptWithHighlights = (
         const absoluteEndIdx = absoluteStartIdx + word.length;
         
         highlights.push({
-          type: 'filler_word',
+          type: 'filler_word' as const,  // Using a const assertion to match the literal type
           startIdx: absoluteStartIdx,
           endIdx: absoluteEndIdx,
           metadata: {
@@ -58,7 +58,7 @@ const generateTranscriptWithHighlights = (
     const endIdx = Math.min(text.length, middleIdx + 50);
     
     highlights.push({
-      type: 'fast_speech',
+      type: 'fast_speech' as const,  // Using a const assertion to match the literal type
       startIdx,
       endIdx,
       metadata: {
@@ -73,7 +73,7 @@ const generateTranscriptWithHighlights = (
     const textPosition = Math.floor((index + 1) * text.length / (analytics.pauses.longPauses.length + 1));
     
     highlights.push({
-      type: 'pause',
+      type: 'pause' as const,  // Using a const assertion to match the literal type
       startIdx: textPosition,
       endIdx: textPosition + 1,
       metadata: {
