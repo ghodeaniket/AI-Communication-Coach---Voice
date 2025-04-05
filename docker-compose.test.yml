@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  # Test runner service
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - TEST_MODE=true
+      - DYNAMODB_ENDPOINT=http://localstack:4566
+    depends_on:
+      - localstack
+  
+  # LocalStack for AWS services emulation
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=dynamodb,s3,lambda
+      - DEBUG=1
+    volumes:
+      - ./localstack:/docker-entrypoint-initaws.d

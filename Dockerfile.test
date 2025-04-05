@@ -1,0 +1,16 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install dependencies for both frontend and backend
+COPY package*.json ./
+RUN npm install
+
+# Copy source code
+COPY . .
+
+# Install test dependencies
+RUN npm install -D jest @testing-library/svelte vitest
+
+# Run tests
+CMD ["npm", "run", "test"]

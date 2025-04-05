@@ -1,0 +1,23 @@
+name: Backend CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, development ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-pipeline.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+
+jobs:
+  # Placeholder for backend CI/CD jobs
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Placeholder step
+        run: echo "Backend CI/CD pipeline placeholder"
