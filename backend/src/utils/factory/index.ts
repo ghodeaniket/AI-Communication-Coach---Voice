@@ -1,10 +1,13 @@
 import { 
   ITranscriptionService,
-  ISpeechAnalyticsService
+  ISpeechAnalyticsService,
+  IFeedbackService,
+  FeedbackLevel
 } from '../../interfaces';
 import { 
   WhisperTranscriptionService,
-  SpeechAnalyticsService
+  SpeechAnalyticsService,
+  FeedbackService
 } from '../../services';
 
 // Cache for singleton service instances
@@ -62,4 +65,33 @@ export function getSpeechAnalyticsService(
   return service;
 }
 
-// Additional factory functions will be added here as we implement more services
+/**
+ * Factory function to get the FeedbackService instance
+ * Creates a singleton instance or uses a provided instance
+ */
+export function getFeedbackService(
+  instance?: IFeedbackService,
+  feedbackLevel: FeedbackLevel = FeedbackLevel.INTERMEDIATE
+): IFeedbackService {
+  // If an instance is provided, use it (useful for testing)
+  if (instance) {
+    return instance;
+  }
+  
+  // Use cached instance if available
+  if (serviceInstances['feedbackService']) {
+    const service = serviceInstances['feedbackService'];
+    service.setFeedbackLevel(feedbackLevel);
+    return service;
+  }
+  
+  // Create new instance
+  const service = new FeedbackService({
+    feedbackLevel
+  });
+  
+  // Cache the instance
+  serviceInstances['feedbackService'] = service;
+  
+  return service;
+}
