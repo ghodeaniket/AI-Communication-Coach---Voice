@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import { handler as healthHandler } from './handlers/health';
 import { handler as transcriptionHandler } from './handlers/transcription';
+import { handler as speechAnalyticsHandler } from './handlers/speechAnalytics';
+import { handler as feedbackHandler } from './handlers/feedback';
 
 // Create Express server
 const app = express();
@@ -9,7 +11,7 @@ const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // Increased limit for audio uploads
 app.use(express.urlencoded({ extended: true }));
 
 // Lambda handler wrapper for Express
@@ -47,8 +49,13 @@ const lambdaWrapper = (handler: any) => async (req: express.Request, res: expres
 // Routes
 app.get('/health', lambdaWrapper(healthHandler));
 app.post('/transcribe', lambdaWrapper(transcriptionHandler));
+app.post('/analyze', lambdaWrapper(speechAnalyticsHandler));
+app.post('/feedback', lambdaWrapper(feedbackHandler));
 
 // Start server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
+  console.log(`Health check: http://localhost:${port}/health`);
+  console.log('Transcription service integrated with OpenAI Whisper');
+  console.log('Environment:', process.env.NODE_ENV || 'development');
 });

@@ -1,31 +1,8 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { TranscriptionRequest, AudioData, TranscriptionResult } from '../interfaces';
-import { corsHeaders } from '../utils/cors';
 import { createErrorResponse, createSuccessResponse } from '../utils/responses';
-
-// This is a placeholder implementation until we connect to the OpenAI Whisper API
-const mockTranscribe = async (audio: AudioData): Promise<TranscriptionResult> => {
-  // In a real implementation, we would send the audio to the OpenAI Whisper API
-  // For now, we'll return a mock result
-  console.log(`Mock transcribing audio: ${audio.duration}s, ${audio.format}, ${audio.size} bytes`);
-  
-  // Simulate processing delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  return {
-    text: "This is a mock transcription for development purposes. It simulates what would be returned from the Whisper API.",
-    confidence: 0.95,
-    duration: audio.duration,
-    wordTimings: [
-      { word: "This", startTime: 0.0, endTime: 0.2, confidence: 0.98 },
-      { word: "is", startTime: 0.2, endTime: 0.3, confidence: 0.99 },
-      { word: "a", startTime: 0.3, endTime: 0.4, confidence: 0.99 },
-      { word: "mock", startTime: 0.4, endTime: 0.7, confidence: 0.96 },
-      { word: "transcription", startTime: 0.7, endTime: 1.5, confidence: 0.94 }
-      // Additional word timings would be included in a real response
-    ]
-  };
-};
+import { getTranscriptionService } from '../utils/factory';
+import { WhisperTranscriptionService } from '../services/transcription';
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
@@ -62,14 +39,37 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       size: request.audio.size
     };
     
+    // Get transcription service
+    const transcriptionService = getTranscriptionService();
+    
     // Process the transcription
-    const result = await mockTranscribe(audioData);
+    let result: TranscriptionResult;
+    
+    try {
+      // Use mock transcription for development if API key is not set
+      if (!process.env.OPENAI_API_KEY && transcriptionService instanceof WhisperTranscriptionService) {
+        console.log('Using mock transcription (no API key)');
+        result = await transcriptionService.mockTranscribe(audioData);
+      } else {
+        // Use real transcription service
+        result = await transcriptionService.transcribe(audioData);
+      }
+    } catch (error) {
+      console.error('Error during transcription:', error);
+      
+      // Provide a more helpful error message
+      return createErrorResponse(
+        500,
+        'Transcription failed',
+        error instanceof Error ? error.message : 'Unknown error during transcription'
+      );
+    }
     
     // Return the result
     return createSuccessResponse(result);
     
   } catch (error) {
-    console.error('Error processing transcription:', error);
+    console.error('Error processing transcription request:', error);
     return createErrorResponse(
       500, 
       'Internal server error',
