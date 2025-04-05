@@ -12,6 +12,7 @@
   export let currentState = AppState.IDLE;
   export let isRecording = false;
   export let audioServiceAvailable = false;
+  export let servicesInitialized = false;
   export let onToggleRecording: () => void;
   export let onGenerateMockData: () => void;
   export let transcription = '';
@@ -32,85 +33,106 @@
     <!-- Status indicator -->
     <StatusIndicator {currentState} {isRecording} />
     
-    <div class="max-w-5xl mx-auto">
-      <!-- Main content area with flex layout -->
-      <div class="flex flex-col lg:flex-row gap-6">
-        <!-- Left column - Recording and results -->
-        <div class="lg:w-3/4">
-          <!-- Recording controls -->
-          <div class="flex flex-col items-center mb-8">
-            <div class="flex flex-col sm:flex-row items-center gap-4">
-              <!-- Record button -->
-              <RecordButton {isRecording} onToggleRecording={onToggleRecording} />
+    {#if !servicesInitialized}
+      <div class="max-w-2xl mx-auto bg-yellow-50 p-6 rounded-lg border border-yellow-200 mb-8">
+        <h2 class="text-xl font-semibold mb-2 text-yellow-700">Initializing Services</h2>
+        <p class="text-yellow-600 mb-4">Please wait while the application services are being initialized...</p>
+      </div>
+    {:else}
+      <div class="max-w-5xl mx-auto">
+        <!-- Main content area with flex layout -->
+        <div class="flex flex-col lg:flex-row gap-6">
+          <!-- Left column - Recording and results -->
+          <div class="lg:w-3/4">
+            <!-- Recording controls -->
+            <div class="flex flex-col items-center mb-8">
+              <div class="flex flex-col sm:flex-row items-center gap-4">
+                <!-- Record button -->
+                <RecordButton {isRecording} onToggleRecording={onToggleRecording} />
+                
+                <!-- Mock data button -->
+                <button 
+                  class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                  on:click={onGenerateMockData}
+                >
+                  Generate Mock Data
+                </button>
+              </div>
               
-              <!-- Mock data button -->
-              <button 
-                class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-                on:click={onGenerateMockData}
-              >
-                Generate Mock Data
-              </button>
+              <p class="mt-4 text-gray-600 text-center">
+                {#if !audioServiceAvailable}
+                  <span class="text-orange-600 font-semibold">Audio recording is not available. Use "Generate Mock Data" instead.</span>
+                {:else if currentState === AppState.IDLE}
+                  Click the button to start recording your speech
+                {:else if currentState === AppState.RECORDING}
+                  Click again to stop recording when you're finished
+                {:else if currentState === AppState.PROCESSING}
+                  Please wait while we analyze your speech...
+                {:else if currentState === AppState.RESULTS}
+                  Review your results below
+                {:else if currentState === AppState.ERROR}
+                  An error occurred. Please try again.
+                {/if}
+              </p>
             </div>
             
-            <p class="mt-4 text-gray-600 text-center">
-              {#if !audioServiceAvailable}
-                <span class="text-orange-600 font-semibold">Audio recording is not available. Use "Generate Mock Data" instead.</span>
-              {:else if currentState === AppState.IDLE}
-                Click the button to start recording your speech
-              {:else if currentState === AppState.RECORDING}
-                Click again to stop recording when you're finished
-              {:else if currentState === AppState.PROCESSING}
-                Please wait while we analyze your speech...
-              {:else if currentState === AppState.RESULTS}
-                Review your results below
-              {:else if currentState === AppState.ERROR}
-                An error occurred. Please try again.
-              {/if}
-            </p>
+            <!-- Development tools (only in dev mode) -->
+            {#if import.meta.env.DEV}
+              <div class="mb-6 p-3 bg-gray-200 rounded text-sm">
+                <div class="flex flex-col gap-2">
+                  <span class="font-semibold">Development Tools</span>
+                  <div>
+                    <div class="text-xs text-gray-600">
+                      Services Status:
+                      <span class="{servicesInitialized ? 'text-green-600' : 'text-red-600'}">
+                        {servicesInitialized ? 'Initialized' : 'Not Initialized'}
+                      </span>
+                    </div>
+                    <div class="text-xs text-gray-600">
+                      Audio Service:
+                      <span class="{audioServiceAvailable ? 'text-green-600' : 'text-red-600'}">
+                        {audioServiceAvailable ? 'Available' : 'Not Available'}
+                      </span>
+                    </div>
+                  </div>
+                  <!-- Add microphone test component for debugging -->
+                  <AudioTest />
+                </div>
+              </div>
+            {/if}
+            
+            <!-- Results section -->
+            {#if currentState === AppState.RESULTS}
+              <div class="space-y-6">
+                <!-- Transcription -->
+                <TranscriptionDisplay {transcription} {highlights} />
+                
+                <!-- Analytics & Feedback -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <AnalyticsDisplay {analytics} />
+                  <FeedbackDisplay {feedback} />
+                </div>
+              </div>
+            {:else if currentState === AppState.ERROR}
+              <div class="bg-red-50 p-6 rounded-lg border border-red-200 text-center">
+                <h2 class="text-xl font-semibold mb-2 text-red-700">Error</h2>
+                <p class="text-red-600 mb-4">Sorry, something went wrong while processing your speech.</p>
+                <p>Please try recording again. If the problem persists, try refreshing the page.</p>
+              </div>
+            {/if}
           </div>
           
-          <!-- Development tools (only in dev mode) -->
-          {#if import.meta.env.DEV}
-            <div class="mb-6 p-3 bg-gray-200 rounded text-sm">
-              <div class="flex flex-col gap-2">
-                <span class="font-semibold">Development Tools</span>
-                <!-- Add microphone test component for debugging -->
-                <AudioTest />
+          <!-- Right column - Saved results -->
+          <div class="lg:w-1/4">
+            {#if savedResults && savedResults.length > 0}
+              <div class="bg-white rounded-lg shadow p-4">
+                <h2 class="text-lg font-medium mb-3">Previous Recordings</h2>
+                <SavedResultsList {savedResults} {onLoadResult} />
               </div>
-            </div>
-          {/if}
-          
-          <!-- Results section -->
-          {#if currentState === AppState.RESULTS}
-            <div class="space-y-6">
-              <!-- Transcription -->
-              <TranscriptionDisplay {transcription} {highlights} />
-              
-              <!-- Analytics & Feedback -->
-              <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <AnalyticsDisplay {analytics} />
-                <FeedbackDisplay {feedback} />
-              </div>
-            </div>
-          {:else if currentState === AppState.ERROR}
-            <div class="bg-red-50 p-6 rounded-lg border border-red-200 text-center">
-              <h2 class="text-xl font-semibold mb-2 text-red-700">Error</h2>
-              <p class="text-red-600 mb-4">Sorry, something went wrong while processing your speech.</p>
-              <p>Please try recording again. If the problem persists, try refreshing the page.</p>
-            </div>
-          {/if}
-        </div>
-        
-        <!-- Right column - Saved results -->
-        <div class="lg:w-1/4">
-          {#if savedResults && savedResults.length > 0}
-            <div class="bg-white rounded-lg shadow p-4">
-              <h2 class="text-lg font-medium mb-3">Previous Recordings</h2>
-              <SavedResultsList {savedResults} {onLoadResult} />
-            </div>
-          {/if}
+            {/if}
+          </div>
         </div>
       </div>
-    </div>
+    {/if}
   </div>
 </div>

@@ -21,6 +21,14 @@
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }
+  
+  // Handle keyboard events for accessibility
+  function handleKeyDown(event: KeyboardEvent, id: string) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onLoadResult(id);
+    }
+  }
 </script>
 
 <div class="space-y-3">
@@ -28,8 +36,12 @@
     <p class="text-gray-500 text-sm text-center py-4">No saved recordings yet</p>
   {:else}
     {#each savedResults as result}
-      <div class="bg-gray-50 p-3 rounded border border-gray-200 hover:bg-gray-100 transition cursor-pointer"
-           on:click={() => onLoadResult(result.id)}>
+      <button 
+        class="bg-gray-50 p-3 rounded border border-gray-200 hover:bg-gray-100 transition cursor-pointer w-full text-left"
+        on:click={() => onLoadResult(result.id)}
+        on:keydown={(e) => handleKeyDown(e, result.id)}
+        aria-label={`Load recording from ${formatDate(result.timestamp)}`}
+      >
         <div class="flex justify-between items-start mb-1">
           <span class="text-sm font-medium text-gray-700 truncate">
             {formatDate(result.timestamp)}
@@ -51,7 +63,7 @@
         <p class="text-xs text-gray-600 line-clamp-2">
           {result.textPreview}
         </p>
-      </div>
+      </button>
     {/each}
   {/if}
 </div>

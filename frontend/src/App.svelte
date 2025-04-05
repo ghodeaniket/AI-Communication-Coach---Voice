@@ -23,13 +23,14 @@
   let savedResults = [];
   
   // Resolve services from container
-  let audioService: IAudioService;
-  let stateService: IStateService;
-  let apiClient: IAPIClient;
-  let resultsService: IResultsService;
+  let audioService: IAudioService | null = null;
+  let stateService: IStateService | null = null;
+  let apiClient: IAPIClient | null = null;
+  let resultsService: IResultsService | null = null;
   
-  // Flag for audio service availability
+  // Flag for services availability
   let audioServiceAvailable = false;
+  let servicesInitialized = false;
   let loadError = '';
   
   onMount(() => {
@@ -38,9 +39,31 @@
     try {
       // Initialize services from container
       console.log('Resolving services from container');
-      stateService = container.resolve('IStateService');
-      apiClient = container.resolve('IAPIClient');
-      resultsService = container.resolve('IResultsService');
+      
+      try {
+        stateService = container.resolve('IStateService');
+        console.log('State service resolved:', stateService?.constructor.name);
+      } catch (e) {
+        console.error('Failed to resolve state service:', e);
+        loadError = 'Failed to initialize state service. Application cannot function properly.';
+        return;
+      }
+      
+      try {
+        apiClient = container.resolve('IAPIClient');
+        console.log('API client resolved:', apiClient?.constructor.name);
+      } catch (e) {
+        console.error('Failed to resolve API client:', e);
+        apiClient = null;
+      }
+      
+      try {
+        resultsService = container.resolve('IResultsService');
+        console.log('Results service resolved:', resultsService?.constructor.name);
+      } catch (e) {
+        console.error('Failed to resolve results service:', e);
+        resultsService = null;
+      }
       
       // Try to initialize audio service
       try {
@@ -49,34 +72,30 @@
         audioServiceAvailable = !!audioService;
       } catch (e) {
         console.error('Failed to resolve audio service:', e);
+        audioService = null;
         audioServiceAvailable = false;
       }
       
-      console.log('Services resolved:', { 
-        audioService: audioServiceAvailable ? audioService?.constructor.name : 'Not Available', 
-        stateService: stateService?.constructor.name,
-        apiClient: apiClient?.constructor.name,
-        resultsService: resultsService?.constructor.name
-      });
-    
-      // Subscribe to state changes
-      stateService.subscribe({
-        update: (state, data) => {
-          currentState = state;
-          stateData = data;
-          
-          // Handle state-specific logic
-          if (state === AppState.RESULTS && data.transcription) {
-            transcription = data.transcription.text;
-            highlights = data.highlights || [];
-            feedback = data.feedback || { overall: '', improvements: [], strengths: [] };
-            analytics = data.analytics || {};
+      if (stateService) {
+        // Subscribe to state changes
+        stateService.subscribe({
+          update: (state, data) => {
+            currentState = state;
+            stateData = data;
+            
+            // Handle state-specific logic
+            if (state === AppState.RESULTS && data.transcription) {
+              transcription = data.transcription.text;
+              highlights = data.highlights || [];
+              feedback = data.feedback || { overall: '', improvements: [], strengths: [] };
+              analytics = data.analytics || {};
+            }
           }
-        }
-      });
+        });
+      }
       
       // Initialize audio service if available
-      if (audioServiceAvailable) {
+      if (audioServiceAvailable && audioService) {
         audioService.configure({
           sampleRate: config?.audio?.sampleRate || 44100,
           maxDuration: config?.audio?.maxRecordingDuration || 120,
@@ -85,48 +104,67 @@
         
         // Set up event handlers
         audioService.onRecordingStart = () => {
-          stateService.transition(AppState.RECORDING);
+          if (stateService) {
+            stateService.transition(AppState.RECORDING);
+          }
         };
         
         audioService.onRecordingStop = async (audio) => {
           isRecording = false;
-          await processRecordedAudio(audio);
+          if (stateService && apiClient) {
+            await processRecordedAudio(audio);
+          }
         };
       } else {
         console.warn('Audio service not available - recording functionality will be disabled');
       }
       
       // Set up API client
-      if (config?.api?.endpoint) {
+      if (apiClient && config?.api?.endpoint) {
         apiClient.setEndpoint(config.api.endpoint);
       }
       
-      if (config?.api?.timeout) {
+      if (apiClient && config?.api?.timeout) {
         apiClient.setTimeout(config.api.timeout);
       }
       
+      // Mark services as initialized
+      servicesInitialized = true;
+      
       // Check API health
-      checkApiHealth();
+      if (apiClient) {
+        checkApiHealth();
+      }
       
       // Load previous results
-      loadPreviousResults();
+      if (resultsService && stateService) {
+        loadPreviousResults();
+      }
       
       console.log('App mounted with services:', { 
-        audioService: audioServiceAvailable, 
+        audioService: audioServiceAvailable,
         stateService: !!stateService,
         apiClient: !!apiClient,
-        resultsService: !!resultsService
+        resultsService: !!resultsService,
+        servicesInitialized
       });
     } catch (error) {
       console.error('Error in onMount:', error);
       loadError = error instanceof Error ? error.message : String(error);
-      stateService?.transition(AppState.ERROR);
-      stateService?.setStateData('error', error);
+      if (stateService) {
+        stateService.transition(AppState.ERROR);
+        stateService.setStateData('error', error);
+      }
     }
   });
   
   // Load previously saved results
   async function loadPreviousResults(limit = 5) {
+    if (!resultsService || !stateService) {
+      console.error('Cannot load results: services not available');
+      return;
+    }
+    
     try {
       const results = await resultsService.listResults(limit);
       console.log('Loaded previous results:', results);
@@ -139,6 +177,11 @@
   
   // Check API health on startup
   async function checkApiHealth() {
+    if (!apiClient) {
+      console.error('Cannot check API health: API client not available');
+      return;
+    }
+    
     try {
       const health = await apiClient.checkServiceHealth();
       console.log('API health status:', health.status);
@@ -153,6 +196,12 @@
   
   // Process recorded audio through the API
   async function processRecordedAudio(audio: AudioData) {
+    if (!stateService || !apiClient) {
+      console.error('Cannot process audio: services not available');
+      alert('Cannot process audio: services not available');
+      return;
+    }
+    
     try {
       stateService.transition(AppState.PROCESSING);
       stateService.setStateData('audioData', audio);
@@ -161,7 +210,7 @@
       
       // Optimize audio before sending to API
       let optimizedAudio = audio;
-      if (audioServiceAvailable) {
+      if (audioServiceAvailable && audioService) {
         optimizedAudio = await audioService.optimizeAudio(audio);
       }
       
@@ -189,11 +238,16 @@
       analytics = result.analytics;
       
       // Save the result for persistence
-      saveResult(audio, result, highlights);
+      if (resultsService) {
+        saveResult(audio, result, highlights);
+      }
     } catch (error) {
       console.error('Error processing audio:', error);
-      stateService.transition(AppState.ERROR);
-      stateService.setStateData('error', error);
+      if (stateService) {
+        stateService.transition(AppState.ERROR);
+        stateService.setStateData('error', error);
+      }
+      alert('Error processing audio: ' + (error instanceof Error ? error.message : String(error)));
     }
   }
   
@@ -213,6 +267,12 @@
   async function generateMockData() {
     console.log('Generating mock data...');
     
+    if (!stateService || !apiClient) {
+      console.error('Cannot generate mock data: required services not available');
+      alert('Cannot generate mock data: required services not available');
+      return;
+    }
+    
     try {
       // Create mock audio data
       const mockAudio = createMockAudioData();
@@ -227,6 +287,11 @@
   
   // Save the result to persistent storage
   async function saveResult(audio: AudioData, result: ProcessingResult, highlights: any[]) {
+    if (!resultsService || !stateService) {
+      console.error('Cannot save result: services not available');
+      return;
+    }
+    
     try {
       // Prepare result data
       const recordingResult: RecordingResult = {
@@ -308,8 +373,8 @@
   async function handleToggleRecording() {
     console.log('handleToggleRecording called, isRecording:', isRecording);
     
-    if (!audioServiceAvailable) {
-      console.error('No audio service available');
+    if (!audioServiceAvailable || !audioService || !stateService) {
+      console.error('No audio service available or state service not initialized');
       alert('Audio recording is not available in this environment. Please use the "Generate Mock Data" button instead.');
       return;
     }
@@ -360,6 +425,11 @@
   
   // Handle loading a previous result
   async function handleLoadResult(id: string) {
+    if (!resultsService || !stateService) {
+      console.error('Cannot load result: services not available');
+      return;
+    }
+    
     try {
       const result = await resultsService.getResult(id);
       
@@ -397,6 +467,7 @@
     {currentState}
     {isRecording}
     {audioServiceAvailable}
+    {servicesInitialized}
     onToggleRecording={handleToggleRecording}
     onGenerateMockData={generateMockData}
     {transcription}
