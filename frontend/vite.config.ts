@@ -1,7 +1,13 @@
 import { defineConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 
-// https://vite.dev/config/
+// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [svelte()],
+  server: {
+    host: '0.0.0.0',
+    hmr: {
+      overlay: false // Disable the error overlay for now
+    }
+  }
 })

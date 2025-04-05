@@ -7,6 +7,9 @@ RUN npm install
 
 COPY . .
 
+# Update PostCSS config file with the correct syntax and package reference
+RUN echo 'export default { plugins: { "@tailwindcss/postcss": {}, "autoprefixer": {} } }' > postcss.config.js
+
 EXPOSE 5173
 
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

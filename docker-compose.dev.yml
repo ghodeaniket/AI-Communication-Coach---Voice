@@ -9,29 +9,10 @@ services:
     ports:
       - "5173:5173"
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
     environment:
       - VITE_API_ENDPOINT=http://localhost:3000/api
-    depends_on:
-      - backend-dev
-  
-  # Backend development service
-  backend-dev:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.dev
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
-    environment:
-      - NODE_ENV=development
-      - PORT=3000
-      - DYNAMODB_ENDPOINT=http://localstack:4566
-    depends_on:
-      - localstack
   
   # LocalStack for AWS services emulation
   localstack:

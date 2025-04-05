@@ -61,7 +61,7 @@ export function validateBackendEnv(): {
 export function createBackendConfig() {
   const { env, success, error } = validateBackendEnv();
   
-  if (!success) {
+  if (!success || !env) {
     console.error('Environment validation failed:', 
       error?.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', '));
     

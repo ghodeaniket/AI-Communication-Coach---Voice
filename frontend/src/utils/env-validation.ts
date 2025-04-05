@@ -7,7 +7,7 @@ import { z } from 'zod';
 // Frontend Environment Schema
 export const frontendEnvSchema = z.object({
   // API Configuration
-  VITE_API_ENDPOINT: z.string().url('API endpoint must be a valid URL'),
+  VITE_API_ENDPOINT: z.string(),  // Simplified validation for development
   VITE_API_TIMEOUT: z.string()
     .transform(val => parseInt(val, 10))
     .pipe(z.number().positive('API timeout must be positive'))

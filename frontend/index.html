@@ -4,10 +4,44 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + Svelte + TS</title>
+    <title>Voice-Based AI Communication Coach</title>
+    <style>
+      /* Temporary debug styles */
+      #debug-output {
+        position: fixed;
+        top: 0;
+        left: 0;
+        background: rgba(0,0,0,0.8);
+        color: #00ff00;
+        font-family: monospace;
+        font-size: 12px;
+        padding: 10px;
+        max-height: 200px;
+        overflow: auto;
+        z-index: 9999;
+        width: 100%;
+      }
+    </style>
   </head>
   <body>
+    <div id="debug-output"></div>
     <div id="app"></div>
+    <script type="module">
+      // Debug helper
+      window.debugLog = function(message) {
+        const debugEl = document.getElementById('debug-output');
+        const logItem = document.createElement('div');
+        logItem.textContent = `[${new Date().toISOString()}] ${message}`;
+        debugEl.appendChild(logItem);
+        console.log(message);
+      };
+      
+      window.addEventListener('error', (event) => {
+        window.debugLog(`ERROR: ${event.message} at ${event.filename}:${event.lineno}`);
+      });
+      
+      window.debugLog('Page loaded, initializing application...');
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
