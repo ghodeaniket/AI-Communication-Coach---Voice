@@ -1,11 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type DIContainer from './di-container';
   import type { IAudioService, IStateService } from './interfaces';
-  import RecordButton from './components/RecordButton.svelte';
-  import StateDemo from './components/StateDemo.svelte';
   import { AppState } from './services/StateService';
-  import { runDIExample } from './examples/di-example';
+  import AppLayout from './components/AppLayout.svelte';
   
   // Props passed from main.ts
   export let container: any = null;
@@ -16,8 +13,12 @@
   let isRecording = false;
   let currentState = AppState.IDLE;
   let stateData: any = {};
-  let transcriptionText: string = '';
-  let diTestResult: string = '';
+  
+  // Results data
+  let transcription = '';
+  let highlights = [];
+  let feedback = { overall: '', improvements: [], strengths: [] };
+  let analytics = {};
   
   // Resolve services from container
   let audioService: IAudioService;
@@ -36,54 +37,68 @@
       stateService = container.resolve('IStateService');
       console.log('StateService resolved:', stateService);
     
-    // Subscribe to state changes
-    stateService.subscribe({
-      update: (state, data) => {
-        currentState = state;
-        stateData = data;
-        
-        // Handle state-specific logic
-        if (state === AppState.RESULTS && data.transcription) {
-          transcriptionText = data.transcription.text;
+      // Subscribe to state changes
+      stateService.subscribe({
+        update: (state, data) => {
+          currentState = state;
+          stateData = data;
+          
+          // Handle state-specific logic
+          if (state === AppState.RESULTS && data.transcription) {
+            transcription = data.transcription.text;
+            
+            // In a real app, these would come from the backend
+            highlights = data.highlights || [];
+            feedback = data.feedback || { overall: '', improvements: [], strengths: [] };
+            analytics = data.analytics || {};
+          }
         }
-      }
-    });
-    
-    // Initialize audio service
-    audioService.configure({
-      sampleRate: config?.audio?.sampleRate || 44100,
-      maxDuration: config?.audio?.maxRecordingDuration || 120,
-      reduceNoise: config?.audio?.noiseReduction || true
-    });
-    
-    // Set up event handlers
-    audioService.onRecordingStart = () => {
-      stateService.transition(AppState.RECORDING);
-    };
-    
-    audioService.onRecordingStop = async (audio) => {
-      isRecording = false;
-      stateService.transition(AppState.PROCESSING);
-      stateService.setStateData('audioData', audio);
+      });
       
-      try {
-        // In a real app, we would process the audio here
-        // For now just simulate a delay and transition to results
-        setTimeout(() => {
-          stateService.transition(AppState.RESULTS);
-          stateService.setStateData('transcription', {
-            text: 'This is a mock transcription. The real app would process the audio and display the results here.',
-            confidence: 0.95
-          });
-        }, 2000);
-      } catch (error) {
-        console.error('Error processing audio:', error);
-        stateService.transition(AppState.ERROR);
-        stateService.setStateData('error', error);
-      }
-    };
-    
-    console.log('App mounted with services:', { audioService, stateService });
+      // Initialize audio service
+      audioService.configure({
+        sampleRate: config?.audio?.sampleRate || 44100,
+        maxDuration: config?.audio?.maxRecordingDuration || 120,
+        reduceNoise: config?.audio?.noiseReduction || true
+      });
+      
+      // Set up event handlers
+      audioService.onRecordingStart = () => {
+        stateService.transition(AppState.RECORDING);
+      };
+      
+      audioService.onRecordingStop = async (audio) => {
+        isRecording = false;
+        stateService.transition(AppState.PROCESSING);
+        stateService.setStateData('audioData', audio);
+        
+        try {
+          // In a real app, we would process the audio here by sending to backend
+          // For now just simulate a delay and transition to results with mock data
+          setTimeout(() => {
+            stateService.transition(AppState.RESULTS);
+            
+            // Set mock results data
+            const mockResults = getMockResults();
+            stateService.setStateData('transcription', { text: mockResults.transcription });
+            stateService.setStateData('highlights', mockResults.highlights);
+            stateService.setStateData('feedback', mockResults.feedback);
+            stateService.setStateData('analytics', mockResults.analytics);
+            
+            // Update local state for components
+            transcription = mockResults.transcription;
+            highlights = mockResults.highlights;
+            feedback = mockResults.feedback;
+            analytics = mockResults.analytics;
+          }, 2000);
+        } catch (error) {
+          console.error('Error processing audio:', error);
+          stateService.transition(AppState.ERROR);
+          stateService.setStateData('error', error);
+        }
+      };
+      
+      console.log('App mounted with services:', { audioService, stateService });
     } catch (error) {
       console.error('Error in onMount:', error);
     }
@@ -110,94 +125,70 @@
     }
   }
   
-  // Test DI framework
-  async function testDependencyInjection() {
-    try {
-      const result = await runDIExample();
-      diTestResult = `DI Test successful! Result: ${result}`;
-      console.log('DI Test result:', result);
-    } catch (error) {
-      diTestResult = `DI Test failed: ${error}`;
-      console.error('DI Test error:', error);
-    }
+  // Create mock results for testing
+  function getMockResults() {
+    return {
+      transcription: "Hello, um, thank you for, uh, listening to my speech today. I'm going to talk about effective communication. So, you know, communication is really important in our daily lives. It helps us connect with others and, like, share our ideas. When we communicate clearly, we can avoid misunderstandings and build stronger relationships. Um, another thing to consider is that good communication involves active listening. This means, you know, paying attention to what others are saying and responding thoughtfully. In conclusion, effective communication is essential for success in both personal and professional contexts.",
+      highlights: [
+        { start: 7, end: 9, type: 'filler', tooltip: 'Filler word' },
+        { start: 28, end: 30, type: 'filler', tooltip: 'Filler word' },
+        { start: 108, end: 117, type: 'pause', tooltip: 'Long pause (1.2s)' },
+        { start: 160, end: 168, type: 'emphasis', tooltip: 'Good emphasis' },
+        { start: 277, end: 279, type: 'filler', tooltip: 'Filler word' },
+        { start: 342, end: 350, type: 'filler', tooltip: 'Filler word' }
+      ],
+      feedback: {
+        overall: "Your speech was generally clear and well-structured with a good introduction and conclusion. However, you used several filler words that could be reduced to make your delivery more polished.",
+        improvements: [
+          "Reduce filler words like 'um' and 'uh'",
+          "Consider using more varied sentence structures",
+          "Practice more natural pausing between key points"
+        ],
+        strengths: [
+          "Clear introduction and conclusion",
+          "Good topic explanation",
+          "Appropriate speaking pace"
+        ],
+        score: 78
+      },
+      analytics: {
+        speakingRate: {
+          wordsPerMinute: 145,
+          syllablesPerMinute: 195,
+          rating: "good"
+        },
+        fillerWords: {
+          count: 5,
+          words: ["um", "uh", "like", "you know"],
+          percentage: 8.2
+        },
+        pauses: {
+          count: 4,
+          totalDuration: 5.3,
+          avgDuration: 1.33
+        },
+        duration: 62
+      }
+    };
   }
 </script>
 
-<main class="min-h-screen bg-gray-100">
-  <div class="container mx-auto px-4 py-8">
-    <h1 class="text-3xl font-bold mb-8 text-center">Voice-Based AI Communication Coach</h1>
-    
-    {#if error}
-      <div class="w-full max-w-2xl mx-auto bg-red-50 p-6 rounded-lg border border-red-200">
-        <h2 class="text-xl font-semibold mb-2 text-red-700">Application Error</h2>
-        <p class="text-red-600 mb-4">{error}</p>
-        <p>Please check the browser console for more details or try refreshing the page.</p>
-      </div>
-    {:else}
-    <div class="flex flex-col items-center justify-center gap-8">
-      <!-- Testing section -->
-      <div class="w-full max-w-2xl bg-white p-6 rounded-lg shadow">
-        <h2 class="text-xl font-semibold mb-4">Phase 1 Testing</h2>
-        <p class="mb-4">Test the Dependency Injection framework:</p>
-        <button 
-          class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-          on:click={() => {
-            console.log('DI Test button clicked');
-            testDependencyInjection();
-          }}
-        >
-          Run DI Test
-        </button>
-        
-        {#if diTestResult}
-          <div class="mt-4 p-3 bg-gray-100 rounded">
-            <p>{diTestResult}</p>
-          </div>
-        {/if}
-      </div>
-      
-      <!-- Recording section -->
-      <div class="text-center">
-        <RecordButton {isRecording} onToggleRecording={handleToggleRecording} />
-        <p class="mt-2">
-          {#if currentState === AppState.IDLE}
-            Click to start recording
-          {:else if currentState === AppState.RECORDING}
-            Recording... Click to stop
-          {:else if currentState === AppState.PROCESSING}
-            Processing your speech...
-          {:else if currentState === AppState.RESULTS}
-            Recording complete!
-          {:else if currentState === AppState.ERROR}
-            Error occurred. Please try again.
-          {/if}
-        </p>
-      </div>
-      
-      <!-- Results section -->
-      {#if currentState === AppState.RESULTS && transcriptionText}
-        <div class="w-full max-w-2xl bg-white p-6 rounded-lg shadow">
-          <h2 class="text-xl font-semibold mb-4">Transcription</h2>
-          <p class="whitespace-pre-line">{transcriptionText}</p>
-        </div>
-      {/if}
-      
-      <!-- Error section -->
-      {#if currentState === AppState.ERROR}
-        <div class="w-full max-w-2xl bg-red-50 p-6 rounded-lg border border-red-200">
-          <h2 class="text-xl font-semibold mb-2 text-red-700">Error</h2>
-          <p class="text-red-600">
-            {stateData.error?.message || 'An unknown error occurred'}
-          </p>
-        </div>
-      {/if}
-      
-      <!-- State Management Demo Section -->
-      <div class="w-full max-w-2xl bg-white p-6 rounded-lg shadow mt-8">
-        <h2 class="text-xl font-semibold mb-4">State Management Demo</h2>
-        <StateDemo />
-      </div>
+{#if error}
+  <div class="min-h-screen bg-gray-100 flex items-center justify-center">
+    <div class="max-w-2xl mx-auto bg-red-50 p-6 rounded-lg border border-red-200">
+      <h2 class="text-xl font-semibold mb-2 text-red-700">Application Error</h2>
+      <p class="text-red-600 mb-4">{error}</p>
+      <p>Please check the browser console for more details or try refreshing the page.</p>
     </div>
-    {/if}
   </div>
-</main>
+{:else}
+  <AppLayout 
+    {currentState}
+    {isRecording}
+    onToggleRecording={handleToggleRecording}
+    {transcription}
+    {highlights}
+    {feedback}
+    {analytics}
+  />
+{/if}
