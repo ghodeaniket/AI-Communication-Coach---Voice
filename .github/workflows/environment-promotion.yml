@@ -1,0 +1,179 @@
+name: Environment Promotion
+
+on:
+  workflow_dispatch:
+    inputs:
+      source-environment:
+        description: 'Source environment'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+      target-environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      components:
+        description: 'Components to promote'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - frontend
+          - backend
+
+jobs:
+  validate-promotion:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate promotion path
+        run: |
+          # Check valid promotion paths
+          if [[ "${{ github.event.inputs.source-environment }}" == "development" && "${{ github.event.inputs.target-environment }}" == "production" ]]; then
+            echo "Invalid promotion path: Cannot promote directly from development to production"
+            exit 1
+          fi
+          
+          echo "Validating promotion from ${{ github.event.inputs.source-environment }} to ${{ github.event.inputs.target-environment }}"
+          echo "Components to promote: ${{ github.event.inputs.components }}"
+  
+  promote-frontend:
+    needs: validate-promotion
+    if: github.event.inputs.components == 'frontend' || github.event.inputs.components == 'all'
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.target-environment }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        
+      - name: Setup promotion
+        id: setup
+        run: |
+          # Set branch names based on environments
+          if [[ "${{ github.event.inputs.source-environment }}" == "development" ]]; then
+            SOURCE_BRANCH="development"
+          elif [[ "${{ github.event.inputs.source-environment }}" == "staging" ]]; then
+            SOURCE_BRANCH="staging"
+          fi
+          
+          if [[ "${{ github.event.inputs.target-environment }}" == "staging" ]]; then
+            TARGET_BRANCH="staging"
+          elif [[ "${{ github.event.inputs.target-environment }}" == "production" ]]; then
+            TARGET_BRANCH="main"
+          fi
+          
+          echo "::set-output name=source_branch::${SOURCE_BRANCH}"
+          echo "::set-output name=target_branch::${TARGET_BRANCH}"
+      
+      - name: Merge branches
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+          
+          echo "Merging frontend code from ${{ steps.setup.outputs.source_branch }} to ${{ steps.setup.outputs.target_branch }}"
+          
+          # Fetch both branches
+          git fetch origin ${{ steps.setup.outputs.source_branch }}:${{ steps.setup.outputs.source_branch }}
+          git fetch origin ${{ steps.setup.outputs.target_branch }}:${{ steps.setup.outputs.target_branch }}
+          
+          # Checkout target branch
+          git checkout ${{ steps.setup.outputs.target_branch }}
+          
+          # Create merge branch
+          MERGE_BRANCH="merge/${{ steps.setup.outputs.source_branch }}_to_${{ steps.setup.outputs.target_branch }}/$(date +%Y%m%d%H%M%S)"
+          git checkout -b $MERGE_BRANCH
+          
+          # Merge only frontend directory
+          git checkout ${{ steps.setup.outputs.source_branch }} -- frontend/
+          
+          # Commit the changes
+          git commit -m "Promote frontend from ${{ github.event.inputs.source-environment }} to ${{ github.event.inputs.target-environment }}"
+          
+          # Push the merge branch
+          git push origin $MERGE_BRANCH
+          
+          # Create a pull request using GitHub CLI if available or GitHub API
+          echo "Creating pull request for frontend promotion"
+          PR_TITLE="Promote frontend from ${{ github.event.inputs.source-environment }} to ${{ github.event.inputs.target-environment }}"
+          PR_BODY="This PR was automatically created to promote frontend changes from ${{ github.event.inputs.source-environment }} to ${{ github.event.inputs.target-environment }}"
+          
+          # This is a placeholder, you would use gh CLI or GitHub API to create the PR
+          echo "PR Title: $PR_TITLE"
+          echo "PR Body: $PR_BODY"
+          echo "Base branch: ${{ steps.setup.outputs.target_branch }}"
+          echo "Head branch: $MERGE_BRANCH"
+  
+  promote-backend:
+    needs: validate-promotion
+    if: github.event.inputs.components == 'backend' || github.event.inputs.components == 'all'
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.target-environment }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        
+      - name: Setup promotion
+        id: setup
+        run: |
+          # Set branch names based on environments
+          if [[ "${{ github.event.inputs.source-environment }}" == "development" ]]; then
+            SOURCE_BRANCH="development"
+          elif [[ "${{ github.event.inputs.source-environment }}" == "staging" ]]; then
+            SOURCE_BRANCH="staging"
+          fi
+          
+          if [[ "${{ github.event.inputs.target-environment }}" == "staging" ]]; then
+            TARGET_BRANCH="staging"
+          elif [[ "${{ github.event.inputs.target-environment }}" == "production" ]]; then
+            TARGET_BRANCH="main"
+          fi
+          
+          echo "::set-output name=source_branch::${SOURCE_BRANCH}"
+          echo "::set-output name=target_branch::${TARGET_BRANCH}"
+      
+      - name: Merge branches
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+          
+          echo "Merging backend code from ${{ steps.setup.outputs.source_branch }} to ${{ steps.setup.outputs.target_branch }}"
+          
+          # Fetch both branches
+          git fetch origin ${{ steps.setup.outputs.source_branch }}:${{ steps.setup.outputs.source_branch }}
+          git fetch origin ${{ steps.setup.outputs.target_branch }}:${{ steps.setup.outputs.target_branch }}
+          
+          # Checkout target branch
+          git checkout ${{ steps.setup.outputs.target_branch }}
+          
+          # Create merge branch
+          MERGE_BRANCH="merge/${{ steps.setup.outputs.source_branch }}_to_${{ steps.setup.outputs.target_branch }}/$(date +%Y%m%d%H%M%S)"
+          git checkout -b $MERGE_BRANCH
+          
+          # Merge only backend directory
+          git checkout ${{ steps.setup.outputs.source_branch }} -- backend/
+          
+          # Commit the changes
+          git commit -m "Promote backend from ${{ github.event.inputs.source-environment }} to ${{ github.event.inputs.target-environment }}"
+          
+          # Push the merge branch
+          git push origin $MERGE_BRANCH
+          
+          # Create a pull request using GitHub CLI if available or GitHub API
+          echo "Creating pull request for backend promotion"
+          PR_TITLE="Promote backend from ${{ github.event.inputs.source-environment }} to ${{ github.event.inputs.target-environment }}"
+          PR_BODY="This PR was automatically created to promote backend changes from ${{ github.event.inputs.source-environment }} to ${{ github.event.inputs.target-environment }}"
+          
+          # This is a placeholder, you would use gh CLI or GitHub API to create the PR
+          echo "PR Title: $PR_TITLE"
+          echo "PR Body: $PR_BODY"
+          echo "Base branch: ${{ steps.setup.outputs.target_branch }}"
+          echo "Head branch: $MERGE_BRANCH"

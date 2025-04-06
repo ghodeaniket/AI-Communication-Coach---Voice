@@ -2,17 +2,105 @@ name: Integration Tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [ staging, main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run tests against'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
 
 jobs:
-  # Placeholder for integration test jobs
-  placeholder:
+  integration-tests:
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    defaults:
+      run:
+        working-directory: ./tests
+    
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
-      
-      - name: Placeholder step
-        run: echo "Integration tests placeholder"
+        
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: ./tests/package-lock.json
+          
+      - name: Install dependencies
+        run: |
+          if [ -f package.json ]; then
+            npm ci
+          else
+            echo "No package.json found in tests directory"
+            mkdir -p integration
+            npm init -y
+            npm install -D jest playwright @playwright/test axios
+          fi
+          
+      - name: Install Playwright browsers
+        run: |
+          if command -v npx &> /dev/null; then
+            npx playwright install --with-deps chromium
+          else
+            echo "npx not available, skipping Playwright browser installation"
+          fi
+        
+      - name: Determine test environment URL
+        id: env-url
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "production" ] || [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "::set-output name=api_url::${{ secrets.PROD_API_ENDPOINT }}"
+            echo "::set-output name=frontend_url::${{ secrets.PROD_FRONTEND_URL }}"
+          elif [ "${{ github.event.inputs.environment }}" = "development" ]; then
+            echo "::set-output name=api_url::${{ secrets.DEV_API_ENDPOINT }}"
+            echo "::set-output name=frontend_url::${{ secrets.DEV_FRONTEND_URL }}"
+          else
+            echo "::set-output name=api_url::${{ secrets.STAGING_API_ENDPOINT }}"
+            echo "::set-output name=frontend_url::${{ secrets.STAGING_FRONTEND_URL }}"
+          fi
+        
+      - name: Create test config
+        run: |
+          cat > test-config.json << EOF
+          {
+            "apiUrl": "${{ steps.env-url.outputs.api_url }}",
+            "frontendUrl": "${{ steps.env-url.outputs.frontend_url }}",
+            "environment": "${{ github.event.inputs.environment || 'staging' }}"
+          }
+          EOF
+          
+      - name: Run API integration tests
+        run: |
+          echo "Running API integration tests against ${{ steps.env-url.outputs.api_url }}"
+          # Run API tests - placeholder that would run once tests are implemented
+          # npm run test:api
+          
+      - name: Run E2E tests
+        run: |
+          echo "Running E2E tests against ${{ steps.env-url.outputs.frontend_url }}"
+          # Run E2E tests - placeholder that would run once tests are implemented
+          # npm run test:e2e
+          
+      - name: Generate test report
+        if: always()
+        run: |
+          echo "Generating test report"
+          # mkdir -p test-results
+          # echo "Test execution completed at $(date)" > test-results/summary.txt
+          
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ github.event.inputs.environment || 'staging' }}
+          path: ./tests/test-results
