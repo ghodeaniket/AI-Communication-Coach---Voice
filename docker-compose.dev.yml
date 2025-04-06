@@ -12,14 +12,71 @@ services:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
     environment:
+      # API Configuration
       - VITE_API_ENDPOINT=http://host.docker.internal:3333/api
       - VITE_API_TIMEOUT=30000
       - VITE_API_VERSION=v1
+      # AWS LocalStack Connection
+      - VITE_AWS_ENDPOINT=http://localstack:4566
+      - VITE_AWS_REGION=us-east-1
+      - VITE_AWS_ACCESS_KEY_ID=test
+      - VITE_AWS_SECRET_ACCESS_KEY=test
+      # Audio Configuration
       - VITE_MAX_RECORDING_DURATION=120
       - VITE_AUDIO_SAMPLE_RATE=44100
       - VITE_AUDIO_NOISE_REDUCTION=true
+      # Local Service Configuration
+      - VITE_USE_LOCAL_SERVICES=true
+      - VITE_USE_MOCK_SERVICES=false
+      - VITE_USE_SPEECH_RECOGNITION=true
+      - VITE_SIMULATE_NETWORK_DELAY=true
+      - VITE_NETWORK_DELAY_MS=500
+      # Feature Flags
       - VITE_FEATURE_ADVANCED_METRICS=true
       - VITE_FEATURE_RECORDING_COMPARISON=true
       - VITE_FEATURE_SOCIAL_SHARING=false
+    depends_on:
+      - localstack
+      - mock-server
     extra_hosts:
       - "host.docker.internal:host-gateway"
+  
+  # LocalStack for AWS service emulation
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+      - "4510-4559:4510-4559" # external service port range
+    environment:
+      - SERVICES=s3,dynamodb,lambda,apigateway
+      - DEBUG=1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - PERSISTENCE=1
+      - LAMBDA_EXECUTOR=docker
+      - DATA_DIR=/tmp/localstack/data
+    volumes:
+      - ./localstack:/docker-entrypoint-initaws.d
+      - ./localstack-data:/tmp/localstack/data
+      - /var/run/docker.sock:/var/run/docker.sock
+  
+  # Mock Server for API endpoints
+  mock-server:
+    build:
+      context: ./mock-server
+      dockerfile: Dockerfile
+    ports:
+      - "3333:3333"
+    volumes:
+      - ./mock-server:/app
+    environment:
+      - AWS_ENDPOINT=http://localstack:4566
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - DYNAMO_TABLE=voice-coach-results
+      - S3_BUCKET=voice-coach-storage
+    depends_on:
+      - localstack

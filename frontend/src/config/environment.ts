@@ -24,13 +24,21 @@ export interface EnvironmentConfig {
     simulateNetworkDelay: boolean;
     networkDelayMs: number;
   };
+  aws: {
+    endpoint?: string;
+    region: string;
+    credentials?: {
+      accessKeyId: string;
+      secretAccessKey: string;
+    };
+  };
 }
 
 // Default configuration values by environment
 const environmentConfigs: Record<Environment, EnvironmentConfig> = {
   development: {
-    apiEndpoint: import.meta.env.VITE_API_ENDPOINT || 'http://localhost:3000/api',
-    useLocalServices: true,
+    apiEndpoint: import.meta.env.VITE_API_ENDPOINT || 'http://localhost:3333/api',
+    useLocalServices: import.meta.env.VITE_USE_LOCAL_SERVICES !== 'false',
     useMockServices: import.meta.env.VITE_USE_MOCK_SERVICES === 'true',
     debug: true,
     logging: {
@@ -46,6 +54,14 @@ const environmentConfigs: Record<Environment, EnvironmentConfig> = {
       useSpeechRecognition: import.meta.env.VITE_USE_SPEECH_RECOGNITION !== 'false',
       simulateNetworkDelay: import.meta.env.VITE_SIMULATE_NETWORK_DELAY === 'true',
       networkDelayMs: Number(import.meta.env.VITE_NETWORK_DELAY_MS || 500)
+    },
+    aws: {
+      endpoint: import.meta.env.VITE_AWS_ENDPOINT || 'http://localhost:4566',
+      region: import.meta.env.VITE_AWS_REGION || 'us-east-1',
+      credentials: {
+        accessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID || 'test',
+        secretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY || 'test'
+      }
     }
   },
   testing: {
@@ -66,6 +82,9 @@ const environmentConfigs: Record<Environment, EnvironmentConfig> = {
       useSpeechRecognition: false,
       simulateNetworkDelay: false,
       networkDelayMs: 0
+    },
+    aws: {
+      region: 'us-east-1'
     }
   },
   production: {
@@ -86,6 +105,9 @@ const environmentConfigs: Record<Environment, EnvironmentConfig> = {
       useSpeechRecognition: false,
       simulateNetworkDelay: false,
       networkDelayMs: 0
+    },
+    aws: {
+      region: import.meta.env.VITE_AWS_REGION || 'us-east-1'
     }
   }
 };
