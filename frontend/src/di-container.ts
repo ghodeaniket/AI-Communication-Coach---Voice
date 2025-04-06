@@ -118,8 +118,5 @@ export class DIContainer {
   }
 }
 
-// Create container
-const container = new DIContainer();
-
-// Export singleton container instance
-export default container;
+// Export the container class - we'll use the factory to create instances
+export { DIContainer, ServiceLifetime };

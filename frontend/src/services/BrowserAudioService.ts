@@ -1,4 +1,5 @@
 import type { IAudioService, AudioOptions, AudioData } from '../interfaces';
+import { config } from '../config/environment';
 
 /**
  * Browser-based implementation of IAudioService that uses the browser's
@@ -13,13 +14,13 @@ export class BrowserAudioService implements IAudioService {
   private recordingTimer: number | null = null;
   private gainNode: GainNode | null = null;
   
-  // Configuration options
+  // Configuration options with defaults from environment config
   private options: Required<AudioOptions> = {
-    sampleRate: 44100,
+    sampleRate: config.audio.sampleRate,
     channels: 1,
-    reduceNoise: true,
+    reduceNoise: config.audio.noiseReduction,
     normalizeVolume: true,
-    maxDuration: 120, // 2 minutes
+    maxDuration: config.audio.maxRecordingDuration,
   };
 
   // Event handlers
