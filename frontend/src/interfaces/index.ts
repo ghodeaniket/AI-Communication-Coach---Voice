@@ -106,3 +106,33 @@ export interface RecordingResultSummary {
   textPreview: string;
   overallScore?: number;
 }
+
+// Speech Analytics Types
+export interface FillerWordAnalysis {
+  count: number;
+  words: string[];
+  frequency: number;
+}
+
+export interface SpeakingRateAnalysis {
+  wordsPerMinute: number;
+  assessment: 'too_fast' | 'too_slow' | 'good';
+}
+
+export interface PauseAnalysis {
+  count: number;
+  totalDuration: number;
+  averageDuration: number;
+  assessment: 'too_many' | 'too_few' | 'good';
+}
+
+export interface SpeechAnalytics {
+  fillerWords: FillerWordAnalysis;
+  speakingRate: SpeakingRateAnalysis;
+  pauses: PauseAnalysis;
+  clarity?: {
+    score: number;
+    assessment: 'excellent' | 'good' | 'fair' | 'poor';
+  };
+  overallScore: number;
+}

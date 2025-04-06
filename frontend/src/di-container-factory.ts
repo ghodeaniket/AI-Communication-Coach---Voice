@@ -11,9 +11,9 @@ import type {
 } from './interfaces';
 
 // Import concrete service implementations
-// Note: These imports will be replaced with actual implementations
-// once they're created
 import { BrowserAudioService } from './services/BrowserAudioService';
+// Note: Local services are imported dynamically to support lazy loading
+// and avoid circular dependencies
 
 // Environment type
 export type Environment = 'development' | 'testing' | 'production';
@@ -70,17 +70,26 @@ export class DIContainerFactory {
    */
   private static registerTranscriptionService(container: DIContainer, environment: Environment): void {
     if (environment === 'development') {
-      // Register local transcription service for development
+      // Import the LocalTranscriptionService implementation
+      import('./services/local/LocalTranscriptionService').then(({ LocalTranscriptionService }) => {
+        if (!container.has('ITranscriptionService')) {
+          container.register('ITranscriptionService', LocalTranscriptionService);
+        }
+      }).catch(error => {
+        console.error('Failed to load LocalTranscriptionService:', error);
+      });
+      
+      // Register a temporary implementation until the import completes
       container.registerFactory('ITranscriptionService', () => {
         return {
           transcribe: async (audio) => ({
-            text: "This is a local transcription for development purposes.",
+            text: "Loading LocalTranscriptionService...",
             confidence: 0.95,
             duration: audio.duration,
             wordTimings: []
           }),
           setModel: (model) => {},
-          getStatus: () => 'ready'
+          getStatus: () => 'loading'
         };
       });
     } else if (environment === 'testing') {
@@ -111,27 +120,36 @@ export class DIContainerFactory {
    */
   private static registerAPIClient(container: DIContainer, environment: Environment): void {
     if (environment === 'development') {
-      // Register local API client for development
+      // Import the LocalAPIClient implementation
+      import('./services/local/LocalAPIClient').then(({ LocalAPIClient }) => {
+        if (!container.has('IAPIClient')) {
+          container.register('IAPIClient', LocalAPIClient);
+        }
+      }).catch(error => {
+        console.error('Failed to load LocalAPIClient:', error);
+      });
+      
+      // Register a temporary implementation until the import completes
       container.registerFactory('IAPIClient', () => {
         return {
           processAudio: async (audio) => ({
             transcription: {
-              text: "This is a local API response for development.",
+              text: "Loading LocalAPIClient...",
               confidence: 0.9,
               duration: audio.duration
             },
             analytics: {
-              fillerWords: { count: 2, words: ['um', 'like'] },
-              speakingRate: { wordsPerMinute: 150, assessment: 'good' },
-              pauses: { count: 3, totalDuration: 1.5, assessment: 'good' }
+              fillerWords: { count: 0, words: [] },
+              speakingRate: { wordsPerMinute: 0, assessment: 'loading' },
+              pauses: { count: 0, totalDuration: 0, assessment: 'loading' }
             },
             feedback: {
-              suggestions: ["Try to reduce filler words."],
-              positives: ["Good speaking pace."],
+              suggestions: ["Loading local services..."],
+              positives: ["Local development environment is initializing."],
               highlights: []
             }
           }),
-          checkServiceHealth: async () => ({ status: 'healthy' }),
+          checkServiceHealth: async () => ({ status: 'initializing' }),
           setEndpoint: () => {},
           setTimeout: () => {}
         };
